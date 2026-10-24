@@ -234,12 +234,14 @@ describe('rasterizeVector', () => {
   });
 
   it('leaves no temporary files behind', async () => {
-    const leftovers = async () => (await readdir(tmpdir())).filter((name) => name.startsWith('arnoplast-vector-'));
     const broken = await tempFile('rotto.pdf', 'questo non è un PDF');
+    // Cartella temporanea privata: altri test (anche di altri worker) creano file temporanei nello stesso momento.
+    const privateTmp = await tempDir();
+    vi.stubEnv('TMPDIR', privateTmp);
 
     await rasterizeVector(PDF_FIXTURE);
     await rasterizeVector(broken).catch(() => undefined);
 
-    expect(await leftovers()).toEqual([]);
+    expect(await readdir(privateTmp)).toEqual([]);
   });
 });
