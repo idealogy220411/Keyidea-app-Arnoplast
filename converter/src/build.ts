@@ -1,26 +1,22 @@
-import { mkdir, mkdtemp, readdir, rm, stat, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { mkdir, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import {
   EDITION_RE,
   LINE_IDS,
   REFERENCE_LANG,
   type Category,
-  type ImageRef,
   type LineData,
   type LineId,
   type Product,
 } from '@arnoplast/schema';
 import { attachImages, type AttachedLanguage } from './associate';
+import { processCategoryImage, processProduct, type ImageContext } from './build-media';
 import { checkLine } from './checks';
 import { loadConfig, type ConverterConfig } from './config';
 import { extractLanguage } from './extract';
 import { readIdml } from './idml/read';
-import { linkFileName, resolveLink } from './links';
-import { mergeLanguages, type MergedProduct } from './merge';
-import { processImage, rasterizeVector, UnsupportedImageError } from './media';
-import { decodeQr, isVideoUrl } from './qr';
-import { renderReport, type ReportInput } from './report';
+import { mergeLanguages } from './merge';
+import { renderReport, type ReportInput, type ReportProduct } from './report';
 import type { Issue } from './types';
 
 export type BuildOptions = { line: LineId; edition: string; inputDir: string; outDir: string; configPath: string };
@@ -111,61 +107,6 @@ async function readLanguage(
   return attachImages(doc, extract, config);
 }
 
-type ImageContext = { linksDir: string; imgDir: string; issues: Issue[] };
-
-/** Percorso del file collegato; se manca segnala un errore bloccante e restituisce `null`. */
-async function locate(linkUri: string, where: string, { linksDir, issues }: ImageContext): Promise<string | null> {
-  const path = await resolveLink(linkUri, linksDir);
-  if (path === null) issues.push(issue('error', `immagine collegata mancante: ${linkFileName(linkUri)}`, where));
-  return path;
-}
-
-/** Esegue la conversione; un formato non supportato è solo un avviso e il risultato è `null`. */
-async function convert(produce: () => Promise<ImageRef>, where: string, { issues }: ImageContext): Promise<ImageRef | null> {
-  try {
-    return await produce();
-  } catch (error) {
-    if (!(error instanceof UnsupportedImageError)) throw error;
-    issues.push(issue('warning', error.message.normalize('NFC'), where));
-    return null;
-  }
-}
-
-/** Rasterizza il disegno in una cartella temporanea (sempre ripulita) e ne ricava miniatura e dettaglio. */
-async function processDrawing(src: string, imgDir: string): Promise<ImageRef> {
-  const png = await rasterizeVector(src);
-  const dir = await mkdtemp(join(tmpdir(), 'arnoplast-drawing-'));
-  try {
-    const file = join(dir, 'disegno.png');
-    await writeFile(file, png);
-    return await processImage(file, imgDir);
-  } finally {
-    await rm(dir, { recursive: true, force: true });
-  }
-}
-
-/** Foto, disegni e video di un prodotto. I file si elaborano uno alla volta, per non riempire la memoria. */
-async function processProduct(product: MergedProduct, ctx: ImageContext): Promise<Pick<Product, 'images' | 'drawings' | 'videoUrl'>> {
-  const media: Pick<Product, 'images' | 'drawings' | 'videoUrl'> = { images: [], drawings: [], videoUrl: null };
-  const add = (list: ImageRef[], ref: ImageRef | null): void => {
-    if (ref && !list.some((other) => other.detail === ref.detail)) list.push(ref);
-  };
-
-  for (const linkUri of product.imageLinks) {
-    const path = await locate(linkUri, product.id, ctx);
-    if (path === null) continue;
-    const qr = await decodeQr(path);
-    if (qr === null) add(media.images, await convert(() => processImage(path, ctx.imgDir), product.id, ctx));
-    else if (isVideoUrl(qr)) media.videoUrl ??= qr;
-    else ctx.issues.push(issue('warning', `QR code non riconosciuto come video: ${qr}`, product.id));
-  }
-  for (const linkUri of product.drawingLinks) {
-    const path = await locate(linkUri, product.id, ctx);
-    if (path !== null) add(media.drawings, await convert(() => processDrawing(path, ctx.imgDir), product.id, ctx));
-  }
-  return media;
-}
-
 /** Legge le lingue, le unisce e prepara le immagini. `null` se un errore impedisce di comporre la linea. */
 async function composeLine(opts: BuildOptions, inputDir: string, imgDir: string, issues: Issue[]): Promise<LineData | null> {
   let config: ConverterConfig;
@@ -194,10 +135,9 @@ async function composeLine(opts: BuildOptions, inputDir: string, imgDir: string,
   // Solo i collegamenti dell'italiano contano: le altre lingue condividono le stesse immagini.
   const ctx: ImageContext = { linksDir: join(inputDir, REFERENCE_LANG, 'Links'), imgDir, issues };
   const categories: Category[] = [];
-  for (const { id, name, order, imageLink, productIds } of merged.categories) {
-    const path = imageLink === null ? null : await locate(imageLink, id, ctx);
-    const image = path === null ? null : await convert(() => processImage(path, imgDir), id, ctx);
-    categories.push({ id, name, order, image, productIds });
+  for (const category of merged.categories) {
+    const { id, name, order, productIds } = category;
+    categories.push({ id, name, order, image: await processCategoryImage(category, ctx), productIds });
   }
   const products: Product[] = [];
   for (const product of merged.products) {
@@ -233,10 +173,24 @@ function statsOf(line: LineData | null): ReportInput['stats'] {
   };
 }
 
+/** Una riga per prodotto, nell'ordine di lettura, con nomi in italiano. */
+function productRows(line: LineData): ReportProduct[] {
+  const categoryNames = new Map(line.categories.map((category) => [category.id, category.name[REFERENCE_LANG]]));
+  return line.products.map((product) => ({
+    category: categoryNames.get(product.categoryId) ?? product.categoryId,
+    name: product.name[REFERENCE_LANG],
+    codes: product.articles.length,
+    images: product.images.length,
+    drawings: product.drawings.length,
+    video: product.videoUrl !== null,
+  }));
+}
+
 /**
  * Costruisce una linea: legge i pacchetti InDesign di `<inputDir>/<lingua>/`, li unisce e scrive
  * `<outDir>/<linea>/img/*.webp`, `<outDir>/<linea>/<edizione>/report.html` e, se non ci sono errori, `data.json`.
- * Gli errori dell'input e dei file sono problemi (`issues`) del risultato, non eccezioni.
+ * Gli errori dell'input e dei file sono problemi (`issues`) del risultato, non eccezioni; un'eccezione imprevista
+ * (per esempio poppler assente) esce da qui, ma solo dopo aver tolto i file della build precedente.
  */
 export async function buildLine(opts: BuildOptions): Promise<BuildResult> {
   const outDir = resolve(opts.outDir);
@@ -247,16 +201,19 @@ export async function buildLine(opts: BuildOptions): Promise<BuildResult> {
   const invalid = checkArguments(opts);
   if (invalid.length > 0) return { ok: false, outDir, dataPath, reportPath, issues: invalid };
 
+  // Una build che non arriva in fondo non deve lasciare dati o rapporto di una build precedente:
+  // `publish` potrebbe prendere per buono un data.json vecchio.
+  await Promise.all([rm(dataPath, { force: true }), rm(reportPath, { force: true })]);
+
   const issues: Issue[] = [];
   const line = await composeLine(opts, resolve(opts.inputDir), join(outDir, opts.line, 'img'), issues);
   if (line) issues.push(...checkLine(line));
   const ok = line !== null && !issues.some((entry) => entry.level === 'error');
 
   await mkdir(editionDir, { recursive: true });
-  await writeFile(reportPath, renderReport({ line: opts.line, edition: opts.edition, issues, stats: statsOf(line) }));
+  const report = { line: opts.line, edition: opts.edition, issues, stats: statsOf(line) };
+  await writeFile(reportPath, renderReport(line ? { ...report, products: productRows(line) } : report));
   if (ok) await writeFile(dataPath, `${JSON.stringify(line, null, 2)}\n`);
-  // Una build con errori non deve lasciare un data.json vecchio che `publish` potrebbe prendere per buono.
-  else await rm(dataPath, { force: true });
 
   return { ok, outDir, dataPath, reportPath, issues };
 }

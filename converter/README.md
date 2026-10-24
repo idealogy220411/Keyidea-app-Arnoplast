@@ -57,8 +57,8 @@ I percorsi relativi partono dalla cartella da cui si lancia il comando (con `pnp
 Il risultato è in `<out>/<linea>/`:
 
 - `img/`: le immagini WebP, miniatura (`-400`) e dettaglio (`-1600`), con il nome ricavato dal contenuto del file. Le immagini già presenti non si rielaborano.
-- `<edizione>/report.html`: il rapporto. Si apre nel browser e riassume categorie, prodotti, articoli, immagini e video, poi elenca **errori** (bloccanti) e **avvisi**.
-- `<edizione>/data.json`: i dati della linea. Si scrive **solo se non ci sono errori**: dopo una build con errori il file non c'è (e uno rimasto da una build precedente viene tolto), così non si può pubblicare per sbaglio una build fallita.
+- `<edizione>/report.html`: il rapporto. Si apre nel browser e riassume categorie, prodotti, articoli, immagini e video, poi elenca **errori** (bloccanti) e **avvisi** e, in fondo, i prodotti con il numero di codici, foto, disegni e l'eventuale video.
+- `<edizione>/data.json`: i dati della linea. Si scrive **solo se non ci sono errori**. All'avvio di ogni build `data.json` e `report.html` della stessa edizione vengono tolti: dopo una build con errori (o interrotta da un guasto) il file non c'è, così non si può pubblicare per sbaglio una build fallita o un file vecchio.
 
 Il comando stampa il numero di errori e di avvisi e il percorso del rapporto, ed **esce con codice 1** se ci sono errori, con 0 altrimenti.
 

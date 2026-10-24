@@ -27,6 +27,7 @@ async function tempDir(): Promise<string> {
 }
 
 afterEach(async () => {
+  vi.unstubAllEnvs();
   await Promise.all(dirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
 });
 
@@ -143,14 +144,7 @@ describe('buildLine', () => {
   });
 
   it('writes report next to data', async () => {
-    const input = await makeSampleInput(await tempDir());
-    // Il QR di un video al posto della foto: il prodotto resta senza foto e l'avviso lo nomina nel rapporto.
-    await writeFile(
-      join(input, 'it', 'Links', 'foto.png'),
-      await QRCode.toBuffer('https://youtu.be/solo-video', { type: 'png', width: 300 }),
-    );
-
-    const result = await build(input);
+    const { result } = await buildSample();
 
     expect(result.ok).toBe(true);
     expect(dirname(result.reportPath)).toBe(dirname(result.dataPath));
@@ -170,6 +164,35 @@ describe('buildLine', () => {
     expect(report).toContain(stat(2, 'Articoli'));
     expect(report).toContain(stat(3, 'Immagini'));
     expect(report).toContain(stat(1, 'Video'));
+  });
+
+  it('lists the products with their counts in the report', async () => {
+    const { result } = await buildSample();
+
+    const report = await readFile(result.reportPath, 'utf8');
+    expect(report).toContain('<h2>Prodotti (1)</h2>');
+    expect(report).toContain(
+      '<tr><td>COPRIPALO</td><td>COPRIPALO PRISMA</td><td class="num">2</td><td class="num">1</td><td class="num">1</td><td>sì</td></tr>',
+    );
+  });
+
+  it('removes the previous data and report when a step throws', async () => {
+    const input = await makeSampleInput(await tempDir());
+    const outDir = await tempDir();
+    const good = await build(input, { outDir });
+    expect(good.ok).toBe(true);
+    expect(await exists(good.dataPath)).toBe(true);
+    expect(await exists(good.reportPath)).toBe(true);
+
+    // Senza pdftoppm nel PATH la rasterizzazione del disegno lancia ENOENT: un'eccezione, non un problema del file.
+    vi.stubEnv('PATH', '');
+    const error = await build(input, { outDir }).catch((e: unknown) => e);
+    vi.unstubAllEnvs();
+
+    expect(error).toBeInstanceOf(Error);
+    expect(error).toMatchObject({ code: 'ENOENT' });
+    expect(await exists(good.dataPath)).toBe(false);
+    expect(await exists(good.reportPath)).toBe(false);
   });
 
   it('removes a stale data.json when the build fails', async () => {

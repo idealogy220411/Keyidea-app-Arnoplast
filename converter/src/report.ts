@@ -1,11 +1,24 @@
 import type { LineId } from '@arnoplast/schema';
 import type { Issue } from './types';
 
+/** Una riga della tabella dei prodotti: nomi in italiano, nell'ordine di lettura del catalogo. */
+export type ReportProduct = {
+  category: string;
+  name: string;
+  /** Numero di codici articolo. */
+  codes: number;
+  images: number;
+  drawings: number;
+  video: boolean;
+};
+
 export type ReportInput = {
   line: LineId;
   edition: string;
   issues: Issue[];
   stats: { categories: number; products: number; articles: number; images: number; videos: number };
+  /** Se manca o è vuoto, il rapporto non ha la sezione dei prodotti. */
+  products?: ReportProduct[];
 };
 
 const HTML_ESCAPES: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
@@ -34,6 +47,8 @@ const STYLE = `
   td.where { width: 30%; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.9rem; }
   .errors th { border-top: 4px solid #E01A22; }
   .warnings th { border-top: 4px solid #b45309; }
+  .products th { border-top: 4px solid #57534e; }
+  .products td.num { text-align: right; }
   .none { margin: 0; padding: 12px 16px; background: #fff; border: 1px solid #d6d3d1; border-radius: 8px; color: #57534e; }
 `;
 
@@ -55,8 +70,25 @@ function issuesSection(title: string, kind: 'errors' | 'warnings', issues: Issue
   return `${heading}\n<table class="${kind}">\n<thead><tr><th>Dove</th><th>Messaggio</th></tr></thead>\n<tbody>\n${rows}\n</tbody>\n</table>`;
 }
 
-/** Rapporto della build: un documento HTML autonomo, in italiano, con riepilogo, errori e avvisi. */
-export function renderReport({ line, edition, issues, stats }: ReportInput): string {
+function productsSection(products: ReportProduct[]): string {
+  const number = (value: number) => `<td class="num">${escapeHtml(String(value))}</td>`;
+  const rows = products
+    .map(
+      ({ category, name, codes, images, drawings, video }) =>
+        `<tr><td>${escapeHtml(category)}</td><td>${escapeHtml(name)}</td>${number(codes)}${number(images)}${number(drawings)}<td>${video ? 'sì' : 'no'}</td></tr>`,
+    )
+    .join('\n');
+  return `<h2>Prodotti (${products.length})</h2>
+<table class="products">
+<thead><tr><th>Categoria</th><th>Prodotto</th><th>Codici</th><th>Foto</th><th>Disegni</th><th>Video</th></tr></thead>
+<tbody>
+${rows}
+</tbody>
+</table>`;
+}
+
+/** Rapporto della build: un documento HTML autonomo, in italiano, con riepilogo, errori, avvisi e prodotti. */
+export function renderReport({ line, edition, issues, stats, products = [] }: ReportInput): string {
   const errors = issues.filter((issue) => issue.level === 'error');
   const warnings = issues.filter((issue) => issue.level === 'warning');
   const title = escapeHtml(`Rapporto ${line} ${edition}`);
@@ -91,7 +123,7 @@ ${statusLine(errors.length)}
 ${statsList}
 </ul>
 ${issuesSection('Errori', 'errors', errors, 'Nessun errore')}
-${issuesSection('Avvisi', 'warnings', warnings, 'Nessun avviso')}
+${issuesSection('Avvisi', 'warnings', warnings, 'Nessun avviso')}${products.length > 0 ? `\n${productsSection(products)}` : ''}
 </main>
 </body>
 </html>

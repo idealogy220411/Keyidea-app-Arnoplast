@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { renderReport } from '../src/report';
+import { renderReport, type ReportProduct } from '../src/report';
 import type { Issue } from '../src/types';
 
 const STATS = { categories: 2, products: 3, articles: 45, images: 67, videos: 8 };
@@ -7,7 +7,10 @@ const STATS = { categories: 2, products: 3, articles: 45, images: 67, videos: 8 
 const error = (message: string, where?: string): Issue => ({ level: 'error', message, where });
 const warning = (message: string, where?: string): Issue => ({ level: 'warning', message, where });
 
-const render = (issues: Issue[], overrides: { line?: 'agricoltura' | 'garden' | 'olive'; edition?: string } = {}) =>
+const render = (
+  issues: Issue[],
+  overrides: { line?: 'agricoltura' | 'garden' | 'olive'; edition?: string; products?: ReportProduct[] } = {},
+) =>
   renderReport({ line: 'agricoltura', edition: '2026.1', issues, stats: STATS, ...overrides });
 
 describe('renderReport', () => {
@@ -112,5 +115,44 @@ describe('renderReport', () => {
     expect(html).toContain('a&amp;b &quot;c&quot; &#39;d&#39;');
     expect(html).toContain('2026.1&quot;&gt;&lt;script&gt;');
     expect(html).not.toContain('<script');
+  });
+
+  it('report lists products', () => {
+    const html = render([warning('Un avviso', 'qubo')], {
+      products: [
+        { category: 'COPRIPALO', name: 'COPRIPALO PRISMA', codes: 12, images: 2, drawings: 1, video: true },
+        { category: 'COPRIPALO', name: 'COPRIPALO QUBO', codes: 4, images: 0, drawings: 0, video: false },
+      ],
+    });
+
+    expect(html).toContain('<h2>Prodotti (2)</h2>');
+    expect(html).toContain(
+      '<th>Categoria</th><th>Prodotto</th><th>Codici</th><th>Foto</th><th>Disegni</th><th>Video</th>',
+    );
+    expect(html).toContain(
+      '<tr><td>COPRIPALO</td><td>COPRIPALO PRISMA</td><td class="num">12</td><td class="num">2</td><td class="num">1</td><td>sì</td></tr>',
+    );
+    expect(html).toContain(
+      '<tr><td>COPRIPALO</td><td>COPRIPALO QUBO</td><td class="num">4</td><td class="num">0</td><td class="num">0</td><td>no</td></tr>',
+    );
+    // Dopo le tabelle di errori e avvisi, nell'ordine di lettura.
+    expect(html.indexOf('<h2>Prodotti (2)')).toBeGreaterThan(html.indexOf('Un avviso'));
+    expect(html.indexOf('COPRIPALO PRISMA')).toBeLessThan(html.indexOf('COPRIPALO QUBO'));
+  });
+
+  it('report escapes html in the products table', () => {
+    const html = render([], {
+      products: [{ category: `<i>Cat</i> & "C"`, name: `<b>X</b> 'Y'`, codes: 1, images: 1, drawings: 0, video: false }],
+    });
+
+    expect(html).toContain('&lt;i&gt;Cat&lt;/i&gt; &amp; &quot;C&quot;');
+    expect(html).toContain('&lt;b&gt;X&lt;/b&gt; &#39;Y&#39;');
+    expect(html).not.toContain('<b>X</b>');
+    expect(html).not.toContain('<i>Cat</i>');
+  });
+
+  it('omits the products section when there are no products', () => {
+    expect(render([])).not.toContain('Prodotti (');
+    expect(render([], { products: [] })).not.toContain('Prodotti (');
   });
 });
