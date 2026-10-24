@@ -1,7 +1,7 @@
 # App catalogo Arno Plast · Specifica di progetto
 
 - **Data:** 24 ottobre 2026
-- **Stato:** da rivedere
+- **Stato:** approvata
 - **Committente:** Idealogy / KeyIdea, per Arno Plast
 - **Bozze grafiche di riferimento:** `docs/mockups/bozze-v2.html`, `docs/mockups/icone-linee-v1.html`
 
