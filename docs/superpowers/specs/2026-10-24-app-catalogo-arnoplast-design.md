@@ -165,13 +165,13 @@ Un file di configurazione abbina ogni stile di paragrafo a un campo. Esempio: «
    - genera una miniatura (circa 400 px) e una versione dettaglio (circa 1600 px), in WebP;
    - le nomina in base al contenuto, così un'immagine invariata non viene riscaricata.
 6. **Controllo:** produce un rapporto leggibile (HTML).
-   - **Bloccanti:** codici duplicati, prodotti senza articoli, schema non valido, immagini collegate mancanti.
+   - **Bloccanti:** codice ripetuto nello stesso prodotto, prodotti senza articoli, schema non valido, immagini collegate mancanti. Lo stesso codice in prodotti diversi è normale (gli accessori, come il Mon-block 1807-0751, compaiono in più tabelle). Diventa un avviso solo se le descrizioni non coincidono.
    - **Avvisi:** traduzioni mancanti, prodotti senza foto, QR non leggibili.
 7. **Pubblicazione:** con un comando separato, dopo il controllo.
 
 ### Pubblicazione sull'hosting
 
-- **Edizioni separate:** ogni edizione va in una cartella con il suo numero, ad esempio `catalogo/agricoltura/2026.1/`.
+- **Edizioni separate:** i dati di ogni edizione vanno in una cartella con il suo numero, ad esempio `catalogo/agricoltura/2026.1/`. Le immagini stanno in una cartella condivisa della linea (`catalogo/agricoltura/img/`) con nomi basati sul contenuto. Così una nuova edizione carica solo le immagini nuove, e il ritorno indietro le trova sempre.
 - **Caricamento:** il convertitore carica i file via SFTP (o FTPS, se l'hosting non offre SFTP). Le credenziali stanno in variabili d'ambiente e mai nel repository.
 - **File indice:** solo alla fine aggiorna `catalogo/index.json`, con l'edizione corrente di ogni linea e l'impronta (hash) dei dati. Ogni linea si aggiorna indipendentemente dalle altre.
 - **Ambiente di prova:** `catalogo-prova/index.json` è letto solo dalla versione di test dell'app.
