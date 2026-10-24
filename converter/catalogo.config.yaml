@@ -1,0 +1,48 @@
+# Configurazione del convertitore del catalogo Arno Plast.
+#
+# Valori provvisori: vanno verificati sul file IDML reale del grafico
+# (nomi degli stili, ordine delle colonne, estensioni dei disegni).
+
+# Lingue del catalogo. «it» è la lingua di riferimento e deve esserci sempre.
+# Per ogni lingua serve una cartella con il suo file IDML.
+languages: [it, en]
+
+# Nome di ogni linea, per lingua. Le linee ammesse sono solo queste tre.
+lines:
+  agricoltura:
+    name: { it: Agricoltura, en: Agriculture }
+  garden:
+    name: { it: Garden, en: Garden }
+  olive:
+    name: { it: Raccolta olive, en: Olive harvesting }
+
+# Nomi degli stili di paragrafo InDesign (senza il prefisso del gruppo di stili).
+styles:
+  category: Titolo categoria     # apre una categoria
+  product: Titolo prodotto       # apre un prodotto nella categoria corrente
+  feature: Caratteristiche       # una caratteristica del prodotto (il punto elenco si toglie da solo)
+  dimension: Dimensioni          # una misura del prodotto (il punto elenco si toglie da solo)
+  material: Bollino materiale    # sigla del materiale: FE, FV, PA, PET, PE, PP, PVC
+
+# Significato delle colonne della tabella articoli, nell'ordine in cui compaiono.
+# Valori ammessi: code, description, perPack, perBox, perPallet, ignore.
+# Le colonne «code» e «description» sono obbligatorie.
+articleColumns: [code, description, perPack, perBox, perPallet]
+
+# Gli articoli la cui descrizione corrisponde a questa espressione regolare
+# (maiuscole e minuscole non contano) sono segnati come optional.
+optionalPattern: '\(optional\)'
+
+# Estensioni dei file dei disegni tecnici collegati, con il punto iniziale.
+drawingExtensions: [.ai, .pdf, .eps, .svg]
+
+# Contatti per le richieste di informazioni (servono alla pubblicazione).
+# contacts:
+#   email: info@example.com
+#   whatsapp: "+39 000 0000000"
+
+# Correzioni a mano, per quello che nel file IDML non si legge.
+# overrides:
+#   materials:
+#     # Nome del prodotto in italiano → materiali che sostituiscono quelli letti.
+#     COPRIPALO PRISMA: [PP]
