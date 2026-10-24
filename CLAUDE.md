@@ -9,4 +9,5 @@ Nuova app catalogo (iPhone, iPad, Android) che sostituisce l'app attuale su App 
 
 ## Struttura
 
-- `docs/mockups/`: bozze grafiche delle schermate (HTML statico).
+- `docs/superpowers/specs/`: specifica di progetto approvata.
+- `docs/mockups/`: bozze grafiche delle schermate e delle icone (HTML statico).
