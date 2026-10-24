@@ -13,7 +13,7 @@ export const EDITION_RE = /^\d{4}\.\d+$/;
 export const LANG_RE = /^[a-z]{2}$/;
 export const REFERENCE_LANG = 'it';
 
-const MAX_PREVIOUS_EDITIONS = 5;
+export const MAX_PREVIOUS_EDITIONS = 5;
 
 // Checked with a regular expression instead of `z.url()`: zod's URL check relies on
 // the `URL` class, which React Native implements only partially.
