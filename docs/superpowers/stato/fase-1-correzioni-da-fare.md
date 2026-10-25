@@ -1,0 +1,31 @@
+# Final review — findings to fix (one fix wave)
+
+Base for this wave: 1d3ac68. Binding rulings: see `global-constraints.md` (Rulings 16–20 are new and decide #2, #3, #4, #5, #6).
+
+## Important
+
+1. **Facing-page reading order in extraction** — `converter/src/extract.ts:54-58,138`. Frames are sorted by y then x across the whole spread, so on facing pages a category title on the left page that sits lower than a product title on the right page drops/misassigns the product, and two products on facing pages with separate title/feature/table frames interleave (Prisma gets no features/articles, Qubo gets both). Fix: sort text frames by page index (page containing the frame's top-left; reuse/extract the page lookup used in `converter/src/associate.ts`, e.g. move it to a shared helper), then y, then x. Add tests for both failure cases with two side-by-side pages (`buildIdml` supports `pages`). The plan test `orders products by spread then position` must still pass.
+
+2. **Re-publishing an edition / cache rules** — `converter/src/publish/publish.ts:42-44,157`, `converter/README.md`. Apply **Ruling 18**: `.htaccess` gives `index.json` AND `data.json` `Cache-Control: no-cache`; `*.webp` keeps `public, max-age=31536000, immutable`. `publishLine` reads the remote `<radice>/<linea>/<edizione>/data.json` (if present) before uploading anything: different sha256 → refuse with an Italian message suggesting a new edition number (nothing uploaded); identical → do not re-upload it. Upload the exact bytes that were validated and hashed (no second disk read — e.g. `writeText` with the validated UTF-8 text, or add a byte-upload method to `RemoteStore` implemented by both stores). Tests: refuse on different remote data.json; identical re-publish uploads nothing but still rewrites/keeps the index consistently; **a re-run skips existing images** (count uploads: second run uploads no `.webp`); fix the vacuous assertion at `converter/test/publish.test.ts:136` (`exists` uses readFile → use `stat`/`access` for directories). Update README (cache rules, how to correct a published edition = new edition number).
+
+3. **SSH host key not verified** — `converter/src/publish/store.ts:134-136`. Apply **Ruling 16**: new env var `ARNO_SFTP_HOST_FINGERPRINT` (format `SHA256:<base64 without padding>` as printed by `ssh-keygen -lf`). Use ssh2's `hostVerifier` (with `hostHash` not set, compute SHA-256 of the raw key buffer, base64 without `=` padding). Missing variable → refuse the connection and throw an Italian error that includes the server's fingerprint and tells the operator to verify it with the hosting provider and set `ARNO_SFTP_HOST_FINGERPRINT`. Mismatch → refuse with an Italian error showing expected vs received. `storeFromEnv`'s missing-variable list must NOT include the fingerprint (it is checked at connect time so the operator can learn it). Unit-test the fingerprint computation/comparison as a pure function (no server). Add `keepaliveInterval` (e.g. 10000 ms) and a `readyTimeout` (e.g. 20000 ms). README: how to obtain/verify the fingerprint.
+
+4. **Missing translations unreported; empty values block the Italian fallback** — `converter/src/merge.ts:191-203`. Apply **Ruling 20**: set a language key only when it has content (non-empty trimmed description; non-empty features/dimensions list). For each product and non-reference language with a match, emit one warning «traduzione incompleta (<lingua>): <nome it>» listing the codes with missing descriptions and which lists (caratteristiche/dimensioni) are empty while Italian has entries; `where` = the lang. Update the test at `converter/test/merge.test.ts:150-173` (`en: []` → key absent) and add tests.
+
+5. **QR handling gaps** — `converter/src/build-media.ts` (~191-202). Apply **Ruling 19**: (a) after rasterizing a drawing (`.pdf`/`.ai`), run `decodeQr` on the temp PNG; a video URL → `videoUrl` (not a drawing). (b) New optional config field `qrFilenamePattern` (string regex, default `qr`, case-insensitive) in `ConverterConfig`/zod/`catalogo.config.yaml` (Italian comment): a linked photo or drawing whose file name matches and does not decode (or is unsupported, e.g. `.eps`/`.svg`) → warning «QR code non leggibile: <file>» and it is used neither as photo nor drawing. (c) A second, different video URL on the same product → warning «più di un video per il prodotto <nome>: <url> ignorato»; update the test at `converter/test/build.test.ts:225` accordingly.
+
+6. **Product ids must include the line** — `converter/src/merge.ts:150`. Apply **Ruling 17**: product id = `<linea>/<slug>` (suffix rule unchanged, applied to the slug part). `mergeLanguages` needs the line id: add a parameter (`mergeLanguages(perLang, line: LineId)`) and update callers/tests; category ids unchanged. Update every test expectation affected (merge, build, checks/report fixtures if they rely on the old format).
+
+7. **Missing poppler / hanging pdftoppm** — `converter/src/media.ts:113-118`. `ENOENT` → throw an Error with an Italian message: «pdftoppm non trovato: installa poppler (su Mac: brew install poppler) e riprova». Add `timeout` (60 000 ms) to `execFile`; a timeout or a signal-killed process → `UnsupportedImageError` (per-file warning). Exit 0 without PNG → `UnsupportedImageError`. Tests for ENOENT message (stub PATH), signal/timeout mapping where practical.
+
+## Deferred items to fix now
+
+8. **Rows with an empty code but other filled cells are dropped silently** — `converter/src/extract.ts:315-319`. Warn («riga della tabella senza codice ignorata: <descrizione>») when the code cell is empty but the description is non-empty or any quantity cell is numeric. Test.
+
+9. **macOS AppleDouble files** — `converter/src/build.ts:85`. Ignore names starting with `.` when looking for the `.idml` (and when listing language folders). Test with a `._catalogo.idml` next to the real one.
+
+## Process
+
+- TDD for each item (failing test first). Keep files focused; `build-media.ts`, `publish.ts`, `store.ts` may grow — if any passes ~250 lines, split sensibly and say so.
+- Run the covering tests per item, then `pnpm typecheck` and the full `pnpm test` (must be green and pristine).
+- Commit in a few logical commits (Italian messages, attribution trailers from your own system instructions). Do not push.
