@@ -265,8 +265,7 @@ Riferimento: `docs/mockups/bozze-v2.html`.
 ### Grafica
 
 - **Colori:**
-  - rosso del marchio `#ED1C24` per fasce, logo e superfici ampie;
-  - `#E01A22` per pulsanti e testi piccoli (contrasto 4,8:1 con il bianco);
+  - rosso del marchio `#E30613` (allineato alle proposte grafiche), per fasce, logo, pulsanti e testi piccoli — contrasto 4,9:1 con il bianco, quindi non serve una seconda tonalità più scura;
   - nero `#231F20`;
   - giallo dei bollini materiale `#FFE500`.
 - **Carattere:** Lato (licenza libera OFL), incluso nell'app.
