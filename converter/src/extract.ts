@@ -1,5 +1,6 @@
 import { ARTICLE_CODE_RE, MATERIALS, type Material } from '@arnoplast/schema';
 import type { ConverterConfig } from './config';
+import { pageIndexAt } from './pages';
 import type { IdmlDocument, IdmlSpread, Issue, TextFrame } from './types';
 
 export type RawArticle = {
@@ -50,11 +51,20 @@ const withoutBullet = (text: string): string => text.replace(/^(?:[•▪]\s*|-\
 
 const isMaterial = (text: string): text is Material => (MATERIALS as readonly string[]).includes(text);
 
-/** Frame di testo dello spread in ordine di lettura: dall'alto in basso, a parità di altezza da sinistra a destra. */
+/**
+ * Frame di testo dello spread in ordine di lettura: prima la pagina che contiene l'angolo in alto a sinistra del
+ * frame (le pagine affiancate di uno spread contengono prodotti diversi: un titolo più in basso sulla pagina
+ * sinistra non deve venire dopo uno più in alto sulla pagina destra), poi dall'alto in basso, poi da sinistra
+ * a destra.
+ */
 function readingOrder(spread: IdmlSpread): TextFrame[] {
   return spread.frames
     .filter((frame): frame is TextFrame => frame.kind === 'text')
-    .sort((a, b) => a.bounds.y - b.bounds.y || a.bounds.x - b.bounds.x);
+    .sort((a, b) => {
+      const pageA = pageIndexAt(spread.pages, a.bounds.x, a.bounds.y);
+      const pageB = pageIndexAt(spread.pages, b.bounds.x, b.bounds.y);
+      return pageA - pageB || a.bounds.y - b.bounds.y || a.bounds.x - b.bounds.x;
+    });
 }
 
 type Quantity = { value: number | null; problem: 'non numerico' | 'zero' | null };
@@ -83,10 +93,22 @@ function readArticleTable(
     return index < 0 ? '' : tidy(row[index] ?? '');
   };
 
+  /** Vero se la cella è un numero (con o senza i punti delle migliaia): non conta `-`, `–` o vuota. */
+  const isNumericCell = (cell: string): boolean => {
+    const text = tidy(cell);
+    return text !== '' && text !== '-' && text !== '–' && /^(?:\d+|\d{1,3}(?:\.\d{3})+)$/.test(text);
+  };
+
   for (const row of rows) {
     const code = cellOf(row, 'code');
     if (!ARTICLE_CODE_RE.test(code)) {
-      if (code !== '' && !CODE_HEADINGS.has(code.normalize('NFC').toUpperCase())) {
+      if (code === '') {
+        const description = cellOf(row, 'description');
+        const hasContent =
+          description !== '' ||
+          (Object.keys(QUANTITY_LABELS) as QuantityColumn[]).some((column) => isNumericCell(cellOf(row, column)));
+        if (hasContent) warn(`riga della tabella senza codice ignorata: ${quote(description)}`);
+      } else if (!CODE_HEADINGS.has(code.normalize('NFC').toUpperCase())) {
         warn(`Riga della tabella saltata nel prodotto ${quote(product.name)}: ${quote(code)} non è un codice articolo`);
       }
       continue;

@@ -3,7 +3,7 @@ import type { ConverterConfig } from '../src/config';
 import { extractLanguage, type LanguageExtract } from '../src/extract';
 import { readIdml } from '../src/idml/read';
 import type { StoryItem } from '../src/types';
-import { buildIdml, buildRawIdml, type TestFrame } from './helpers/build-idml';
+import { buildIdml, buildRawIdml, type TestFrame, type TestPage } from './helpers/build-idml';
 
 const config: ConverterConfig = {
   languages: ['it', 'en'],
@@ -22,6 +22,7 @@ const config: ConverterConfig = {
   articleColumns: ['code', 'description', 'perPack', 'perBox', 'perPallet'],
   optionalPattern: '\\(optional\\)',
   drawingExtensions: ['.ai', '.pdf', '.eps', '.svg'],
+  qrFilenamePattern: 'qr',
 };
 
 const category = (text: string): StoryItem => ({ kind: 'paragraph', style: config.styles.category, text });
@@ -157,6 +158,27 @@ describe('extractLanguage', () => {
     expect(result.issues[0]).toMatchObject({ level: 'warning', where: 'spread 1' });
     expect(result.issues[0].message).toContain('n.d.');
     expect(result.issues[0].message).toContain('1807-1359');
+  });
+
+  it('warns about a row without a code but with other content, and ignores a fully empty row', async () => {
+    const result = await extract(
+      oneProduct(
+        table(
+          HEADER,
+          ['', 'Descrizione senza codice', '40', '40', '640'],
+          ['', '', '', '', ''],
+          ['', '', '10', '', ''],
+          ['1807-1362', 'Articolo vero', '40', '40', '640'],
+        ),
+      ),
+    );
+    expect(result.products[0].articles).toEqual([
+      { code: '1807-1362', description: 'Articolo vero', perPack: 40, perBox: 40, perPallet: 640 },
+    ]);
+    expect(result.issues).toHaveLength(2);
+    expect(result.issues[0]).toMatchObject({ level: 'warning', where: 'spread 1' });
+    expect(result.issues[0].message).toBe('riga della tabella senza codice ignorata: «Descrizione senza codice»');
+    expect(result.issues[1].message).toBe('riga della tabella senza codice ignorata: «»');
   });
 
   it('removes thousands dots and rejects decimals', async () => {
@@ -317,6 +339,66 @@ describe('extractLanguage', () => {
       'PRODOTTO BASSO A SINISTRA',
       'PRODOTTO DEL SECONDO SPREAD',
     ]);
+  });
+
+  it('reads the left page of a spread before the right one, even with a lower title', async () => {
+    // Due pagine affiancate (0-595 e 595-1190): la categoria è sulla pagina sinistra ma più in basso (y 400)
+    // del titolo del prodotto sulla pagina destra (y 100). Senza tener conto della pagina, l'ordine per sola y
+    // metterebbe il prodotto prima della categoria (errore: "prodotto prima della categoria").
+    const PAGES: TestPage[] = [
+      { x: 0, y: 0, w: 595, h: 842 },
+      { x: 595, y: 0, w: 595, h: 842 },
+    ];
+    const doc = await readIdml(
+      await buildIdml({
+        spreads: [
+          {
+            pages: PAGES,
+            frames: [frame(50, 400, category('COPRIPALO')), frame(650, 100, product('COPRIPALO PRISMA'))],
+          },
+        ],
+      }),
+    );
+    const result = extractLanguage(doc, config, 'it');
+
+    expect(result.issues).toEqual([]);
+    expect(result.categories.map((c) => c.name)).toEqual(['COPRIPALO']);
+    expect(result.products.map((p) => p.name)).toEqual(['COPRIPALO PRISMA']);
+  });
+
+  it('does not interleave the frames of two products on facing pages', async () => {
+    // Pagina sinistra: titolo e caratteristiche di PRISMA. Pagina destra: titolo e tabella di QUBO.
+    // Ordinando solo per y (ignorando la pagina) le caratteristiche di PRISMA (y 700) finirebbero dopo
+    // il titolo di QUBO (y 100), e verrebbero assegnate a QUBO invece che a PRISMA.
+    const PAGES: TestPage[] = [
+      { x: 0, y: 0, w: 595, h: 842 },
+      { x: 595, y: 0, w: 595, h: 842 },
+    ];
+    const doc = await readIdml(
+      await buildIdml({
+        spreads: [
+          {
+            pages: PAGES,
+            frames: [
+              frame(0, 0, category('COPRIPALO')),
+              frame(50, 50, product('COPRIPALO PRISMA')),
+              frame(50, 700, feature('viteria certificata')),
+              frame(650, 100, product('COPRIPALO QUBO')),
+              frame(650, 300, table(HEADER, ['1807-2000', 'Qubo', '1', '1', '1'])),
+            ],
+          },
+        ],
+      }),
+    );
+    const result = extractLanguage(doc, config, 'it');
+
+    const [prisma, qubo] = result.products;
+    expect(prisma.name).toBe('COPRIPALO PRISMA');
+    expect(prisma.features).toEqual(['viteria certificata']);
+    expect(prisma.articles).toEqual([]);
+    expect(qubo.name).toBe('COPRIPALO QUBO');
+    expect(qubo.features).toEqual([]);
+    expect(qubo.articles).toHaveLength(1);
   });
 
   it('reads frames with the same height from left to right', async () => {
