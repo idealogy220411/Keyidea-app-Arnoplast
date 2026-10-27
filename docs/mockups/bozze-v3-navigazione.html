@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Barra di navigazione · bozza</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --brand:#ED1C24; --brand-dark:#C8141B; --brand-soft:#FDECEC; --ink:#231F20;
+  --bg:#F4F4F5; --card:#FFFFFF; --muted:#6E6A6B; --line:#E7E5E5;
+  --page:#EDEDEE; --page-text:#231F20; --page-muted:#5E5A5B;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){ --page:#151414; --page-text:#EDEBEB; --page-muted:#A8A3A4; }
+}
+:root[data-theme="dark"]{ --page:#151414; --page-text:#EDEBEB; --page-muted:#A8A3A4; }
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--page);color:var(--page-text);font-family:"Lato",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;-webkit-font-smoothing:antialiased;padding:32px 16px 64px}
+.intro{max-width:760px;margin:0 auto 32px}
+.intro h1{font-size:24px;font-weight:900;margin-bottom:8px}
+.intro p{color:var(--page-muted);font-size:15px;line-height:1.55}
+.intro .tag{display:inline-block;font-size:11px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;background:var(--brand);color:#fff;border-radius:6px;padding:3px 8px;margin-bottom:10px}
+.row{display:flex;flex-wrap:wrap;justify-content:center;gap:40px;max-width:1200px;margin:0 auto}
+
+.phone{width:320px;height:660px;border-radius:46px;background:#111;padding:10px;box-shadow:0 20px 40px rgba(0,0,0,.18)}
+.screen{position:relative;width:100%;height:100%;border-radius:36px;overflow:hidden;background:var(--bg);color:var(--ink);display:flex;flex-direction:column;font-size:14px}
+.island{position:absolute;top:9px;left:50%;transform:translateX(-50%);width:86px;height:25px;background:#000;border-radius:18px;z-index:20}
+.status{height:44px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:4px 24px 0 28px;font-weight:700;font-size:13px}
+.status svg{height:11px}
+.scroll{flex:1;overflow:hidden}
+.pad{padding:0 16px}
+.homeind{position:absolute;bottom:7px;left:50%;transform:translateX(-50%);width:112px;height:5px;border-radius:3px;background:var(--ink);z-index:30}
+
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:6px 16px 10px}
+.logo{display:flex;align-items:center;gap:7px;font-weight:900;font-size:17px;letter-spacing:.01em}
+.logo i{width:20px;height:20px;background:var(--brand);border-radius:5px;display:block}
+.pill{font-size:11.5px;font-weight:700;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:4px 9px}
+.search{display:flex;align-items:center;gap:8px;height:40px;border-radius:12px;background:#fff;border:1px solid var(--line);padding:0 12px;color:#9A9596;font-size:14px;margin:4px 0 16px}
+.search svg{width:16px;height:16px}
+.sec{font-size:19px;font-weight:900;margin:4px 0 10px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.card{background:var(--card);border-radius:14px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+.thumb{aspect-ratio:4/3;background:linear-gradient(160deg,#EEF0F1,#E2E5E6);display:flex;align-items:center;justify-content:center;color:#B9BEC0}
+.thumb svg{width:44%;height:52%}
+.card .meta{padding:8px 10px 10px}
+.card .name{font-size:12.5px;font-weight:900}
+.card .sub{font-size:11px;color:var(--muted);margin-top:1px}
+
+.tabbar{flex:none;display:flex;background:#fff;border-top:1px solid var(--line);padding:9px 2px 22px}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:9.5px;font-weight:700;color:#A3A0A0}
+.tab svg{width:23px;height:23px}
+.tab.on{color:var(--brand)}
+
+.closeup{width:320px;background:#fff;border-radius:20px;padding:14px 10px 24px;box-shadow:0 6px 18px rgba(0,0,0,.08)}
+.closeup .tabbar{border:0;padding:4px 2px 2px}
+.closeup .tab{font-size:10.5px}
+.closeup .tab svg{width:26px;height:26px}
+.cap{text-align:center;color:var(--page-muted);font-size:12.5px;margin-top:12px}
+figcaption{margin-top:14px;font-size:13.5px;color:var(--page-muted);text-align:center;max-width:320px}
+figcaption b{display:block;color:var(--page-text);font-weight:900;margin-bottom:2px}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="a-trattore" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="16" r="4"/><circle cx="7.5" cy="16" r="1.2"/><circle cx="18" cy="17.5" r="2.5"/><path d="M4 12.3V4.5h6.3l1.6 5H20v5.6"/><path d="M11.5 15.5h4"/><path d="M16.5 9.5V6"/></g></symbol>
+    <symbol id="g-vaso" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 14h13"/><path d="M7 14l1.3 6.5h7.4L17 14"/><path d="M12 14V9"/><path d="M12 11.2c-3.2 0-4.8-1.7-4.8-4.3 3.2 0 4.8 1.7 4.8 4.3z"/><path d="M12 9.7c0-2.5 1.6-4.3 4.8-4.3 0 2.6-1.6 4.3-4.8 4.3z"/></g></symbol>
+    <symbol id="o-oliva" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="11" cy="14.5" rx="5" ry="6.3" transform="rotate(-28 11 14.5)"/><path d="M13.6 8.6c.6-2 1.6-3.4 3-4.4"/><path d="M16.6 4.2c2.6-.6 4.4.1 5 1.6-2.4 1.2-4.2.7-5-1.6z"/></g></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 20 20"/></g></symbol>
+    <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20s-7.5-4.6-7.5-10A4.3 4.3 0 0 1 12 7.4 4.3 4.3 0 0 1 19.5 10c0 5.4-7.5 10-7.5 10z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></symbol>
+    <symbol id="p-box" viewBox="0 0 120 90"><rect x="12" y="20" width="96" height="11" rx="4" fill="currentColor"/><path d="M18 31h84l-6 49H24z" fill="currentColor" opacity=".82"/></symbol>
+    <symbol id="i-status" viewBox="0 0 66 12"><g fill="currentColor"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="6" width="3" height="6" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/><path d="M30 3.2a9 9 0 0 1 10 0l-1.4 1.6a6.8 6.8 0 0 0-7.2 0zM32.3 6a5.4 5.4 0 0 1 5.4 0L35 9.4z"/><rect x="45" y="0.5" width="19" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".5"/><rect x="47" y="2.5" width="14" height="7" rx="1.5"/></g></symbol>
+  </defs>
+</svg>
+
+<header class="intro">
+  <span class="tag">Bozza</span>
+  <h1>Barra a 5 voci, nello stile «A · Essenziale»</h1>
+  <p>Colori e carattere del marchio Arno Plast (come in <code>bozze-v2.html</code>), con la barra in basso già approvata e le tre icone scelte: trattore per Agricoltura, vaso per Garden, oliva per Raccolta olive.</p>
+</header>
+
+<div class="row">
+
+  <figure>
+    <div class="phone"><div class="screen">
+      <div class="island"></div>
+      <div class="status"><span>9:41</span><svg viewBox="0 0 66 12" width="66"><use href="#i-status"/></svg></div>
+      <div class="scroll">
+        <div class="topbar"><div class="logo"><i></i>ARNOplast</div><span class="pill">IT</span></div>
+        <div class="pad">
+          <div class="search"><svg><use href="#i-search"/></svg>Cerca per nome o codice</div>
+          <div class="sec">Categorie</div>
+          <div class="grid2">
+            <div class="card"><div class="thumb"><svg><use href="#p-box"/></svg></div><div class="meta"><div class="name">Copripalo</div><div class="sub">112 articoli</div></div></div>
+            <div class="card"><div class="thumb"><svg><use href="#p-box"/></svg></div><div class="meta"><div class="name">Placchette</div><div class="sub">41 articoli</div></div></div>
+            <div class="card"><div class="thumb"><svg><use href="#p-box"/></svg></div><div class="meta"><div class="name">Ferma teli e reti</div><div class="sub">25 articoli</div></div></div>
+            <div class="card"><div class="thumb"><svg><use href="#p-box"/></svg></div><div class="meta"><div class="name">Moschettoni</div><div class="sub">32 articoli</div></div></div>
+          </div>
+        </div>
+      </div>
+      <nav class="tabbar">
+        <div class="tab on"><svg><use href="#a-trattore"/></svg>Agricoltura</div>
+        <div class="tab"><svg><use href="#g-vaso"/></svg>Garden</div>
+        <div class="tab"><svg><use href="#o-oliva"/></svg>Olive</div>
+        <div class="tab"><svg><use href="#i-search"/></svg>Cerca</div>
+        <div class="tab"><svg><use href="#i-heart"/></svg>Preferiti</div>
+      </nav>
+      <div class="homeind"></div>
+    </div></div>
+    <figcaption><b>Schermata Agricoltura</b>Stile «Essenziale»: sfondo chiaro, fascia e accenti nel rosso del marchio, barra in basso sempre visibile con le tre linee, la ricerca e i preferiti.</figcaption>
+  </figure>
+
+  <figure>
+    <div class="closeup">
+      <nav class="tabbar">
+        <div class="tab on"><svg><use href="#a-trattore"/></svg>Agricoltura</div>
+        <div class="tab"><svg><use href="#g-vaso"/></svg>Garden</div>
+        <div class="tab"><svg><use href="#o-oliva"/></svg>Olive</div>
+        <div class="tab"><svg><use href="#i-search"/></svg>Cerca</div>
+        <div class="tab"><svg><use href="#i-heart"/></svg>Preferiti</div>
+      </nav>
+    </div>
+    <div class="cap" style="margin-top:28px">Da vicino, le 5 icone</div>
+    <figcaption><b>Trattore · Vaso · Oliva · Cerca · Preferiti</b>Le tre icone scelte (dalle proposte B, A e C) accanto a ricerca e preferiti, nello stesso tratto arrotondato.</figcaption>
+  </figure>
+
+</div>
+</body>
+</html>
