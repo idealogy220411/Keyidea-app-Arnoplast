@@ -13,6 +13,8 @@ const THUMB_SIDE = 400;
 const DETAIL_SIDE = 1600;
 /** Risoluzione a cui si rasterizzano i disegni vettoriali. */
 const VECTOR_DPI = '200';
+/** Oltre questo tempo `pdftoppm` si considera bloccato: il processo si uccide e il disegno diventa un avviso. */
+const RASTERIZE_TIMEOUT_MS = 60_000;
 
 /** Formati raster che il convertitore accetta (nomi di sharp). PSD, EPS e simili restano fuori. */
 const RASTER_FORMATS = new Set(['jpeg', 'png', 'tiff', 'webp', 'gif']);
@@ -101,7 +103,8 @@ export async function processImage(src: string, imgDir: string): Promise<ImageRe
 /**
  * Rasterizza a 200 dpi la prima pagina di un disegno vettoriale (`.pdf`, `.ai`) e restituisce il PNG.
  * Gli altri formati vettoriali (EPS, SVG…) non sono supportati. Se `pdftoppm` non riesce a leggere
- * il file si lancia lo stesso `UnsupportedImageError`, così la build lo segnala come avviso.
+ * il file, non risponde entro un minuto, o esce senza scrivere il PNG, si lancia lo stesso
+ * `UnsupportedImageError`, così la build lo segnala come avviso.
  */
 export async function rasterizeVector(src: string): Promise<Buffer> {
   if (!VECTOR_EXTENSIONS.has(extname(src).toLowerCase())) throw new UnsupportedImageError(src);
@@ -110,13 +113,20 @@ export async function rasterizeVector(src: string): Promise<Buffer> {
   try {
     const prefix = join(dir, 'page');
     try {
-      await execFileAsync('pdftoppm', ['-png', '-r', VECTOR_DPI, '-singlefile', src, prefix]);
+      await execFileAsync('pdftoppm', ['-png', '-r', VECTOR_DPI, '-singlefile', src, prefix], {
+        timeout: RASTERIZE_TIMEOUT_MS,
+      });
     } catch (error) {
+      const { code, killed, signal } = error as NodeJS.ErrnoException & { killed?: boolean; signal?: string | null };
+      if (code === 'ENOENT') {
+        throw new Error('pdftoppm non trovato: installa poppler (su Mac: brew install poppler) e riprova');
+      }
       // Codice numerico = `pdftoppm` è partito ed è uscito con errore (file illeggibile).
-      // Altrimenti (es. ENOENT: poppler non installato) è un problema dell'ambiente, non del file.
-      if (typeof (error as { code?: unknown }).code === 'number') throw new UnsupportedImageError(src);
+      // Ucciso da un segnale (anche dal timeout di `execFile`, che manda SIGTERM) = non ha finito in tempo.
+      if (typeof code === 'number' || killed || signal) throw new UnsupportedImageError(src);
       throw error;
     }
+    if (!(await exists(`${prefix}.png`))) throw new UnsupportedImageError(src);
     return await readFile(`${prefix}.png`);
   } finally {
     await rm(dir, { recursive: true, force: true });

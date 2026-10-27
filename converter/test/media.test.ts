@@ -230,7 +230,31 @@ describe('rasterizeVector', () => {
 
     expect(error).toBeInstanceOf(Error);
     expect(error).not.toBeInstanceOf(UnsupportedImageError);
-    expect(error).toMatchObject({ code: 'ENOENT' });
+    expect((error as Error).message).toBe('pdftoppm non trovato: installa poppler (su Mac: brew install poppler) e riprova');
+  });
+
+  /** Un finto `pdftoppm` nel PATH, per simulare senza il programma vero un processo ucciso da un segnale o che esce senza errore. */
+  async function fakePdftoppm(script: string): Promise<string> {
+    const dir = await tempDir();
+    const path = join(dir, 'pdftoppm');
+    await writeFile(path, `#!/bin/sh\n${script}\n`, { mode: 0o755 });
+    return dir;
+  }
+
+  it('reports a pdftoppm killed by a signal (as a timeout would) as an unsupported image', async () => {
+    vi.stubEnv('PATH', await fakePdftoppm('kill -TERM "$$"'));
+
+    const error = await rasterizeVector(PDF_FIXTURE).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(UnsupportedImageError);
+  });
+
+  it('reports a pdftoppm that exits without writing a PNG as an unsupported image', async () => {
+    vi.stubEnv('PATH', await fakePdftoppm('exit 0'));
+
+    const error = await rasterizeVector(PDF_FIXTURE).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(UnsupportedImageError);
   });
 
   it('leaves no temporary files behind', async () => {
