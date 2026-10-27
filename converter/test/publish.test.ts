@@ -367,7 +367,15 @@ describe('publishLine', () => {
     expect(rules).toContain('<IfModule mod_headers.c>');
     expect(rules).toMatch(/index\.json[\s\S]*Header set Cache-Control "no-cache"/);
     expect(rules).toMatch(/webp[\s\S]*Header set Cache-Control "public, max-age=31536000, immutable"/);
-    expect(rules).toContain('data');
+
+    // Ruling 18: data.json ha la sua regola di cache separata da quella delle immagini, ed è no-cache
+    // (un'edizione già pubblicata non cambia contenuto, ma il controllo è nel convertitore, non nella cache):
+    // deve restare separata da quella delle .webp, altrimenti finirebbe "immutable" come le immagini.
+    const lines = rules.split('\n');
+    const dataLine = lines.findIndex((line) => /^\s*<FilesMatch/.test(line) && line.includes('data'));
+    expect(dataLine, rules).toBeGreaterThanOrEqual(0);
+    expect(lines[dataLine]).not.toContain('webp');
+    expect(lines[dataLine + 1]).toContain('Header set Cache-Control "no-cache"');
 
     await writeFile(join(siteDir, 'catalogo-prova', '.htaccess'), '# modificato a mano\n');
     await publish(store, 'agricoltura', '2026.2');
