@@ -7,7 +7,7 @@ un file `data.json` per linea, le immagini WebP e un rapporto HTML con errori e 
 
 - **Node.js 22.12** o successivo.
 - **pnpm**.
-- **poppler** (serve a trasformare in immagini i disegni tecnici in PDF e AI). Su Mac: `brew install poppler`.
+- **poppler** (serve a trasformare in immagini i disegni tecnici in PDF e AI). Su Mac: `brew install poppler`. Senza, `build` si ferma subito con «pdftoppm non trovato: installa poppler (su Mac: brew install poppler) e riprova»; un disegno che `pdftoppm` non riesce a leggere entro un minuto diventa invece solo un avviso (il prodotto resta senza quel disegno).
 
 Dalla radice del repository, una volta sola: `pnpm install`.
 
@@ -65,9 +65,9 @@ Il comando stampa il numero di errori e di avvisi e il percorso del rapporto, ed
 Cosa è un errore e cosa un avviso:
 
 - **Errore**: un'immagine collegata nel documento manca in `Links`, manca la cartella `it`, una cartella lingua non ha un solo `.idml`, una lingua non contiene nessun prodotto (controlla gli stili in `catalogo.config.yaml`), i dati non rispettano lo schema.
-- **Avviso**: un formato immagine non convertibile (per esempio PSD o EPS: il prodotto resta senza quell'immagine), un QR code che non porta a un video, una traduzione mancante, un prodotto senza immagini.
+- **Avviso**: un formato immagine non convertibile (per esempio PSD o EPS: il prodotto resta senza quell'immagine), un QR code che non porta a un video, un QR code che non si riesce a leggere, un secondo video diverso dal primo, una traduzione incompleta o mancante, un prodotto senza immagini.
 
-I QR code collegati come immagini di un prodotto non sono foto: se portano a un video YouTube diventano il video del prodotto (il primo trovato).
+I QR code collegati come immagini (o disegni) di un prodotto non sono foto né disegni: se portano a un video YouTube diventano il video del prodotto (il primo trovato; un secondo video diverso è un avviso e si ignora). Un file il cui nome contiene «qr» (vedi `qrFilenamePattern` in `catalogo.config.yaml`) che non si legge come QR code — per esempio perché il QR è rovinato, o il formato non è convertibile — è un avviso («QR code non leggibile») e non diventa né foto né disegno.
 
 ### Nomi dei disegni
 
@@ -94,11 +94,32 @@ Le credenziali si danno **solo con variabili d'ambiente**:
 | `ARNO_SFTP_PASSWORD` | password; serve questa **oppure** la chiave |
 | `ARNO_SFTP_KEY_PATH` | percorso del file con la chiave privata (senza passphrase) |
 | `ARNO_SFTP_ROOT` | cartella del sito sul server, quella che contiene `catalogo/` e `catalogo-prova/` |
+| `ARNO_SFTP_HOST_FINGERPRINT` | impronta SSH del server, per verificare che non ci si stia collegando a un impostore (vedi sotto) |
 | `ARNO_STORE_LOCAL_DIR` | se è impostata, si pubblica su questa cartella del tuo computer invece che sull'hosting (prova a secco) |
 
-Se ne manca qualcuna il comando le elenca e non si collega.
+Se ne manca qualcuna il comando le elenca e non si collega. Fa eccezione `ARNO_SFTP_HOST_FINGERPRINT`: si controlla solo al momento di collegarsi (vedi sotto), per poterla imparare dal messaggio d'errore la prima volta.
 
 > **Non scrivere mai password o chiavi nel repository**, né nel file di configurazione, negli script o nei messaggi di commit. Impostale nel terminale (per esempio con `export`) o in un file che sta fuori dal repository.
+
+#### Impronta SSH del server (`ARNO_SFTP_HOST_FINGERPRINT`)
+
+Con la password (o anche con la chiave) si deve essere sicuri di collegarsi al server giusto e non a un impostore
+in mezzo alla connessione: il convertitore quindi verifica sempre l'impronta della chiave host del server SFTP, e
+senza `ARNO_SFTP_HOST_FINGERPRINT` si rifiuta di collegarsi.
+
+Al primo utilizzo, lancia `publish` (o `rollback`) senza questa variabile: il comando si ferma e stampa
+l'impronta del server, nel formato `SHA256:...`, la stessa che dà `ssh-keygen -lf` sul server (o che si può
+chiedere al gestore dell'hosting). **Verifica quell'impronta con il gestore dell'hosting** (per telefono, email
+o pannello di controllo: non fidarti di un valore che arriva per lo stesso canale che stai verificando), poi
+impostala:
+
+```bash
+export ARNO_SFTP_HOST_FINGERPRINT='SHA256:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+```
+
+Se l'impronta del server cambia (per esempio dopo una migrazione di hosting) il comando si rifiuta di nuovo e
+mostra sia quella attesa sia quella ricevuta: verificala di nuovo con il gestore dell'hosting prima di aggiornare
+la variabile.
 
 ### Comando `publish`
 
@@ -124,12 +145,12 @@ pnpm catalogo publish --linea agricoltura --edizione 2026.1 --ambiente produzion
 
 Il comando stampa l'edizione corrente della linea, le edizioni precedenti e il percorso dell'indice sul sito (per esempio `catalogo-prova/index.json`). **Esce con codice 1** se qualcosa non va, con 0 altrimenti.
 
-**Prima di caricare** controlla che la linea e l'edizione siano valide, che i contatti ci siano e che `data.json` della build esista, rispetti lo schema e sia proprio della linea e dell'edizione indicate. Se un controllo fallisce non carica nessun file.
+**Prima di caricare** controlla che la linea e l'edizione siano valide, che i contatti ci siano e che `data.json` della build esista, rispetti lo schema e sia proprio della linea e dell'edizione indicate. Controlla anche se quell'edizione è già sul server: se c'è con un `data.json` **diverso** si ferma con un errore che suggerisce un nuovo numero di edizione, e non carica nessun file (vedi «Correggere un'edizione già pubblicata» sotto). Se un controllo fallisce non carica nessun file.
 
 **Cosa carica, in quest'ordine** (le cartelle sono sotto `catalogo-prova/` o `catalogo/`):
 
 1. le immagini `.webp` di `<linea>/img/` che non sono già sul server (i nomi dipendono dal contenuto, quindi un file presente è quello giusto);
-2. `data.json` e `report.html` in `<linea>/<edizione>/`;
+2. `data.json` e `report.html` in `<linea>/<edizione>/`, **solo se quell'edizione non è già pubblicata** (se lo è, con lo stesso contenuto, ripubblicarla non carica nulla);
 3. il file `.htaccess` con le regole di cache, **solo se non c'è già**;
 4. `index.json`, **per ultimo**.
 
@@ -155,16 +176,25 @@ Alla prima pubblicazione di un ambiente `publish` scrive `<radice>/.htaccess`, p
   <Files "index.json">
     Header set Cache-Control "no-cache"
   </Files>
-  <FilesMatch "^(data\.json|.+\.webp)$">
+  <FilesMatch "^data\.json$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+  <FilesMatch "\.webp$">
     Header set Cache-Control "public, max-age=31536000, immutable"
   </FilesMatch>
 </IfModule>
 ```
 
-- `index.json` non resta in cache: l'app trova subito una nuova edizione.
-- Le immagini e i `data.json` delle edizioni si tengono in cache per un anno: una volta pubblicati non cambiano. **Per correggere un'edizione già pubblicata usa quindi un numero di edizione nuovo**, altrimenti le app che l'hanno già scaricata potrebbero non vedere la correzione.
+- `index.json` e il `data.json` di ogni edizione non restano in cache: un'app che li rilegge vede sempre l'ultima versione sul server.
+- Le immagini si tengono in cache per un anno: il nome dipende dal contenuto, quindi non cambiano mai una volta pubblicate.
 
 Se il file esiste già (anche modificato a mano) non viene mai sovrascritto. Se il server non è Apache o non ha `mod_headers`, le regole non hanno effetto e vanno configurate a mano sul server.
+
+#### Correggere un'edizione già pubblicata
+
+Anche se `data.json` non resta in cache lato browser, **non si può ripubblicare la stessa edizione con un contenuto diverso**: `publish` confronta l'impronta `sha256` del `data.json` della build con quella già pubblicata e, se sono diverse, si rifiuta e non carica nulla (ripubblicarla con lo stesso contenuto, invece, non fa nulla di nuovo). Questo perché l'app può aver salvato in locale i dati di un'edizione fidandosi che lo stesso numero di edizione indichi sempre lo stesso contenuto.
+
+**Per correggere un'edizione già pubblicata, quindi, costruiscila e pubblicala con un numero di edizione nuovo** (per esempio `2026.2` invece di `2026.1`).
 
 ### Prova a secco
 
