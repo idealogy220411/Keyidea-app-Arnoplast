@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { parseLineData, type LineData, type LineId } from '@arnoplast/schema';
 import QRCode from 'qrcode';
+import sharp from 'sharp';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildLine, type BuildResult } from '../src/build';
 import { buildIdml } from './helpers/build-idml';
@@ -57,6 +58,12 @@ const exists = (path: string): Promise<boolean> =>
     () => false,
   );
 
+/** Una semplice foto a tinta unita, senza alcun QR code. */
+const sharpSolidPng = (background: string): Promise<Buffer> =>
+  sharp({ create: { width: 200, height: 150, channels: 3, background } })
+    .png()
+    .toBuffer();
+
 const errorsOf = (result: BuildResult) => result.issues.filter((issue) => issue.level === 'error');
 const warningsOf = (result: BuildResult) => result.issues.filter((issue) => issue.level === 'warning');
 
@@ -89,7 +96,7 @@ describe('buildLine', () => {
     expect(data.products).toHaveLength(1);
     const [product] = data.products;
     expect(product).toMatchObject({
-      id: 'copripalo-prisma',
+      id: 'garden/copripalo-prisma',
       categoryId: 'copripalo',
       name: { it: 'COPRIPALO PRISMA', en: 'POST CAP PRISMA' },
       materials: ['PP'],
@@ -120,11 +127,11 @@ describe('buildLine', () => {
     const errors = errorsOf(result);
     expect(errors).toHaveLength(1);
     expect(errors[0].message).toBe('immagine collegata mancante: manca.jpg');
-    expect(errors[0].where).toBe('copripalo-prisma');
+    expect(errors[0].where).toBe('garden/copripalo-prisma');
     const warnings = warningsOf(result);
     expect(warnings).toHaveLength(1);
     expect(warnings[0].message).toBe('formato immagine non supportato: foto.psd');
-    expect(warnings[0].where).toBe('copripalo-prisma');
+    expect(warnings[0].where).toBe('garden/copripalo-prisma');
 
     // Con errori bloccanti il rapporto c'è, i dati no: la pubblicazione non può partire da una build fallita.
     expect(await exists(result.reportPath)).toBe(true);
@@ -184,13 +191,13 @@ describe('buildLine', () => {
     expect(await exists(good.dataPath)).toBe(true);
     expect(await exists(good.reportPath)).toBe(true);
 
-    // Senza pdftoppm nel PATH la rasterizzazione del disegno lancia ENOENT: un'eccezione, non un problema del file.
+    // Senza pdftoppm nel PATH la rasterizzazione del disegno lancia un'eccezione, non un problema del file.
     vi.stubEnv('PATH', '');
     const error = await build(input, { outDir }).catch((e: unknown) => e);
     vi.unstubAllEnvs();
 
     expect(error).toBeInstanceOf(Error);
-    expect(error).toMatchObject({ code: 'ENOENT' });
+    expect((error as Error).message).toBe('pdftoppm non trovato: installa poppler (su Mac: brew install poppler) e riprova');
     expect(await exists(good.dataPath)).toBe(false);
     expect(await exists(good.reportPath)).toBe(false);
   });
@@ -236,11 +243,32 @@ describe('buildLine', () => {
       {
         level: 'warning',
         message: 'QR code non riconosciuto come video: https://example.com/pagina',
-        where: 'copripalo-prisma',
+        where: 'garden/copripalo-prisma',
+      },
+      {
+        level: 'warning',
+        message: 'più di un video per il prodotto «COPRIPALO PRISMA»: https://youtu.be/seconda ignorato',
+        where: 'garden/copripalo-prisma',
       },
     ]);
     const [product] = (await readData(result)).products;
     expect(product.videoUrl).toBe('https://youtu.be/abc123');
+    expect(product.images).toHaveLength(1);
+  });
+
+  it('warns and drops a file named like a QR code that does not decode', async () => {
+    // Una foto normale, ma il nome fa pensare a un QR code: con il pattern predefinito ('qr') non si legge
+    // come QR, quindi è un avviso e non diventa una foto del prodotto.
+    const { result } = await buildSample({
+      extraLinks: ['qr-rotto.png'],
+      extraFiles: { 'qr-rotto.png': await sharpSolidPng('#00ff00') },
+    });
+
+    expect(result.ok).toBe(true);
+    expect(warningsOf(result)).toEqual([
+      { level: 'warning', message: 'QR code non leggibile: qr-rotto.png', where: 'garden/copripalo-prisma' },
+    ]);
+    const [product] = (await readData(result)).products;
     expect(product.images).toHaveLength(1);
   });
 
@@ -331,6 +359,28 @@ describe('buildLine input validation', () => {
       expect(errorsOf(result)[0].message).toContain('«en»');
       expect(await exists(result.dataPath)).toBe(false);
     }
+  });
+
+  it('ignores a macOS AppleDouble file next to the real idml', async () => {
+    const input = await makeSampleInput(await tempDir());
+    // Il Mac crea questo file «ombra» quando copia su un volume che non supporta i suoi metadati;
+    // non deve contare come un secondo .idml nella cartella.
+    await writeFile(join(input, 'en', '._catalogo.idml'), 'finto');
+
+    const result = await build(input);
+
+    expect(result.ok).toBe(true);
+    expect(result.issues).toEqual([]);
+  });
+
+  it('ignores a hidden folder when looking for language folders', async () => {
+    const input = await makeSampleInput(await tempDir());
+    await mkdir(join(input, '.DS_Store_folder'));
+
+    const result = await build(input);
+
+    expect(result.ok).toBe(true);
+    expect(result.issues).toEqual([]);
   });
 
   it('warns about language folders that are not in the configuration', async () => {

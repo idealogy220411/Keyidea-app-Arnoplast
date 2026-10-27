@@ -23,6 +23,7 @@ const config: ConverterConfig = {
   articleColumns: ['code', 'description', 'perPack', 'perBox', 'perPallet'],
   optionalPattern: '\\(optional\\)',
   drawingExtensions: ['.ai', '.pdf', '.eps', '.svg'],
+  qrFilenamePattern: 'qr',
 };
 
 const category = (text: string): StoryItem => ({ kind: 'paragraph', style: config.styles.category, text });

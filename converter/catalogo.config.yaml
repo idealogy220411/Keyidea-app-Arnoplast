@@ -36,6 +36,11 @@ optionalPattern: '\(optional\)'
 # Estensioni dei file dei disegni tecnici collegati, con il punto iniziale.
 drawingExtensions: [.ai, .pdf, .eps, .svg]
 
+# Nomi di file (foto o disegni collegati) da considerare QR code: se il nome li soddisfa (maiuscole e
+# minuscole non contano) ma il QR non si legge, o il formato non è convertibile, il file diventa un
+# avviso «QR code non leggibile» e non è usato né come foto né come disegno. Valore predefinito: 'qr'.
+# qrFilenamePattern: 'qr'
+
 # Contatti per le richieste di informazioni (servono alla pubblicazione).
 # contacts:
 #   email: info@example.com

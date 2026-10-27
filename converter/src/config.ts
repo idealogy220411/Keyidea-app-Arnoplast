@@ -24,15 +24,32 @@ export type ConverterConfig = {
   optionalPattern: string;
   /** Estensioni dei file dei disegni tecnici, con il punto iniziale. */
   drawingExtensions: string[];
+  /**
+   * Espressione regolare (senza distinzione tra maiuscole e minuscole) dei nomi di file da considerare QR code:
+   * se il nome di un collegamento la soddisfa ma il QR non si legge (o il formato non è convertibile), il file
+   * è un avviso «QR code non leggibile» e non diventa né foto né disegno.
+   */
+  qrFilenamePattern: string;
   contacts?: { email: string; whatsapp: string };
   overrides?: { materials?: Record<string, Material[]> };
 };
 
 const DEFAULT_OPTIONAL_PATTERN = '\\(optional\\)';
+const DEFAULT_QR_FILENAME_PATTERN = 'qr';
 
 const quote = (value: unknown) => `«${String(value)}»`;
 
 const text = z.string().min(1);
+
+/** Vero se `pattern` è un'espressione regolare valida (con `i`, come viene poi usata). */
+function isValidRegex(pattern: string): boolean {
+  try {
+    new RegExp(pattern, 'i');
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 const langCode = z.string().regex(LANG_RE, {
   error: (issue) => `Codice lingua non valido: ${quote(issue.input)} (servono due lettere minuscole, per esempio «en»)`,
@@ -67,23 +84,17 @@ const configSchema: z.ZodType<ConverterConfig> = z.strictObject({
     .refine((columns) => columns.includes('description'), { error: 'Serve una colonna «description»' }),
   optionalPattern: z
     .string()
-    .refine(
-      (pattern) => {
-        try {
-          new RegExp(pattern, 'i');
-          return true;
-        } catch {
-          return false;
-        }
-      },
-      { error: (issue) => `Espressione regolare non valida: ${quote(issue.input)}` },
-    )
+    .refine(isValidRegex, { error: (issue) => `Espressione regolare non valida: ${quote(issue.input)}` })
     .default(DEFAULT_OPTIONAL_PATTERN),
   drawingExtensions: z.array(
     z.string().regex(/^\.[A-Za-z0-9]+$/, {
       error: (issue) => `Estensione non valida: ${quote(issue.input)} (serve il punto iniziale, per esempio «.pdf»)`,
     }),
   ),
+  qrFilenamePattern: z
+    .string()
+    .refine(isValidRegex, { error: (issue) => `Espressione regolare non valida: ${quote(issue.input)}` })
+    .default(DEFAULT_QR_FILENAME_PATTERN),
   contacts: z.strictObject({ email: text, whatsapp: text }).optional(),
   overrides: z.strictObject({ materials: z.record(z.string(), z.array(material)).optional() }).optional(),
 });

@@ -46,6 +46,27 @@ it('config: loads the default file', async () => {
   expect(config.lines.olive.name).toEqual({ it: 'Raccolta olive', en: 'Olive harvesting' });
   expect(config.drawingExtensions).toEqual(['.ai', '.pdf', '.eps', '.svg']);
   expect(new RegExp(config.optionalPattern, 'i').test('Dado a griffe M6 (optional)')).toBe(true);
+  expect(config.qrFilenamePattern).toBe('qr');
+});
+
+it('config: qrFilenamePattern defaults to "qr" and can be overridden', async () => {
+  const defaultFile = await defaultConfigWith(() => {});
+  const defaultConfig = await loadConfig(defaultFile);
+  expect(new RegExp(defaultConfig.qrFilenamePattern, 'i').test('QR-codice.png')).toBe(true);
+  expect(new RegExp(defaultConfig.qrFilenamePattern, 'i').test('foto.png')).toBe(false);
+
+  const custom = await defaultConfigWith((raw) => {
+    raw.qrFilenamePattern = 'codice';
+  });
+  const config = await loadConfig(custom);
+  expect(config.qrFilenamePattern).toBe('codice');
+});
+
+it('config: reports an invalid qrFilenamePattern', async () => {
+  const file = await defaultConfigWith((raw) => {
+    raw.qrFilenamePattern = '(';
+  });
+  await expect(loadConfig(file)).rejects.toThrow(/qrFilenamePattern/);
 });
 
 it('config: reports invalid file in italian', async () => {

@@ -63,7 +63,10 @@ type LanguageInput = { lang: string; idmlPath: string };
 
 /** Il file IDML di ogni lingua della configurazione; cartelle mancanti, estranee o senza un solo IDML finiscono in `issues`. */
 async function findLanguageInputs(inputDir: string, languages: string[], issues: Issue[]): Promise<LanguageInput[]> {
-  const folders = (await readdir(inputDir, { withFileTypes: true })).filter((e) => e.isDirectory()).map((e) => e.name);
+  // Le cartelle che iniziano con «.» (per esempio quelle che crea il Finder) non sono lingue del catalogo.
+  const folders = (await readdir(inputDir, { withFileTypes: true }))
+    .filter((e) => e.isDirectory() && !e.name.startsWith('.'))
+    .map((e) => e.name);
   for (const name of folders.filter((folder) => !languages.includes(folder))) {
     issues.push(issue('warning', `cartella lingua ignorata: ${name}`, name));
   }
@@ -78,7 +81,11 @@ async function findLanguageInputs(inputDir: string, languages: string[], issues:
       );
       continue;
     }
-    const idmlFiles = (await readdir(join(inputDir, lang))).filter((name) => name.toLowerCase().endsWith('.idml'));
+    // «._nomefile.idml»: il file «ombra» che il Mac crea per i metadati su volumi che non li supportano
+    // (per esempio chiavette FAT o alcune condivisioni di rete), non un secondo file IDML.
+    const idmlFiles = (await readdir(join(inputDir, lang))).filter(
+      (name) => !name.startsWith('.') && name.toLowerCase().endsWith('.idml'),
+    );
     if (idmlFiles.length === 1) {
       inputs.push({ lang, idmlPath: join(inputDir, lang, idmlFiles[0]) });
     } else {
@@ -129,11 +136,16 @@ async function composeLine(opts: BuildOptions, inputDir: string, imgDir: string,
   // Il motivo (cartella o IDML dell'italiano inutilizzabili) è già tra gli errori.
   if (!perLang.some(({ lang }) => lang === REFERENCE_LANG)) return null;
 
-  const merged = mergeLanguages(perLang);
+  const merged = mergeLanguages(perLang, opts.line);
   issues.push(...merged.issues);
 
   // Solo i collegamenti dell'italiano contano: le altre lingue condividono le stesse immagini.
-  const ctx: ImageContext = { linksDir: join(inputDir, REFERENCE_LANG, 'Links'), imgDir, issues };
+  const ctx: ImageContext = {
+    linksDir: join(inputDir, REFERENCE_LANG, 'Links'),
+    imgDir,
+    issues,
+    qrFilenamePattern: new RegExp(config.qrFilenamePattern, 'i'),
+  };
   const categories: Category[] = [];
   for (const category of merged.categories) {
     const { id, name, order, productIds } = category;
