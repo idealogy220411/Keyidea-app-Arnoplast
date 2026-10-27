@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { cp, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -78,8 +78,9 @@ const readIndex = async (root = 'catalogo-prova'): Promise<IndexFile> =>
 
 const readSite = (...path: string[]): Promise<string> => readFile(join(siteDir, ...path), 'utf8');
 
+/** Vero se il file o la cartella esiste (a differenza di `readFile`, funziona anche con le cartelle). */
 const exists = (...path: string[]): Promise<boolean> =>
-  readFile(join(siteDir, ...path)).then(
+  stat(join(siteDir, ...path)).then(
     () => true,
     () => false,
   );
@@ -98,6 +99,24 @@ class FailingStore extends LocalStore {
     this.uploads += 1;
     if (this.uploads === this.failAt) throw new Error('connessione interrotta');
     await super.upload(localPath, remotePath);
+  }
+}
+
+/** Un `LocalStore` che conta i caricamenti (per file e `.webp`) e le scritture di testo. */
+class CountingStore extends LocalStore {
+  uploads: string[] = [];
+  webpUploads = 0;
+  texts: string[] = [];
+
+  override async upload(localPath: string, remotePath: string): Promise<void> {
+    this.uploads.push(remotePath);
+    if (remotePath.endsWith('.webp')) this.webpUploads += 1;
+    await super.upload(localPath, remotePath);
+  }
+
+  override async writeText(remotePath: string, text: string): Promise<void> {
+    this.texts.push(remotePath);
+    await super.writeText(remotePath, text);
   }
 }
 
@@ -179,6 +198,56 @@ describe('publishLine', () => {
       lines: { agricoltura: { ...second.lines.agricoltura, publishedAt: first.lines.agricoltura?.publishedAt } },
     }).toEqual(first);
     expect(await readIndex()).toEqual(second);
+  });
+
+  it('uploads nothing on an identical re-publish (same images, same data.json)', async () => {
+    const counting = new CountingStore(siteDir);
+    await publish(counting, 'agricoltura', '2026.1', { now: at(1) });
+    counting.uploads = [];
+    counting.webpUploads = 0;
+    counting.texts = [];
+
+    const second = await publish(counting, 'agricoltura', '2026.1', { now: at(2) });
+
+    expect(counting.uploads).toEqual([]);
+    expect(counting.webpUploads).toBe(0);
+    // Niente da riscrivere: l'.htaccess c'è già, data.json è identico. Resta solo l'indice, sempre aggiornato.
+    expect(counting.texts).toEqual(['catalogo-prova/index.json']);
+    expect(second.lines.agricoltura?.edition).toBe('2026.1');
+    expect(await readIndex()).toEqual(second);
+  });
+
+  it('skips images already on the server on a later publish', async () => {
+    const counting = new CountingStore(siteDir);
+    await publish(counting, 'agricoltura', '2026.1');
+    const firstWebpUploads = counting.webpUploads;
+    expect(firstWebpUploads).toBeGreaterThan(0);
+    counting.webpUploads = 0;
+
+    // Stessa linea, edizione diversa: le immagini (di garden/img, condivise tra edizioni) sono già sul server.
+    await publish(counting, 'agricoltura', '2026.2');
+
+    expect(counting.webpUploads).toBe(0);
+  });
+
+  it('refuses to publish the same edition with different content, and uploads nothing', async () => {
+    const edited = await tempDir();
+    await cp(buildDir, edited, { recursive: true });
+    const dataPath = join(edited, 'agricoltura', '2026.1', 'data.json');
+    const data = JSON.parse(await readFile(dataPath, 'utf8'));
+    data.name.en = 'Agriculture (modificato)';
+    await writeFile(dataPath, `${JSON.stringify(data, null, 2)}\n`);
+
+    await publish(store, 'agricoltura', '2026.1');
+    const before = await readSite('catalogo-prova', 'index.json');
+
+    await expect(publish(store, 'agricoltura', '2026.1', { buildDir: edited })).rejects.toThrow(
+      /2026\.1.*già pubblicata.*nuovo numero di edizione/s,
+    );
+
+    // Né il data.json pubblicato né l'indice cambiano.
+    expect(await readSite('catalogo-prova', 'agricoltura', '2026.1', 'data.json')).not.toContain('modificato');
+    expect(await readSite('catalogo-prova', 'index.json')).toBe(before);
   });
 
   it('keeps previous editions', async () => {

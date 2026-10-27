@@ -26,7 +26,9 @@ export const indexPathOf = (env: PublishEnv): string => `${ROOTS[env]}/index.jso
 
 /**
  * Regole di cache per Apache 2.4 (il server tipico degli hosting WordPress). Si scrivono solo alla prima
- * pubblicazione: chi le modifica a mano non le trova sovrascritte.
+ * pubblicazione: chi le modifica a mano non le trova sovrascritte. Ruling 18: l'indice e il `data.json` di
+ * ogni edizione non vanno mai in cache (così un'app che lo rilegge vede sempre l'ultima versione sul server),
+ * mentre le immagini, il cui nome dipende dal contenuto, restano in cache per un anno.
  */
 const HTACCESS = `# File generato dal convertitore del catalogo Arno Plast (comando "catalogo publish").
 # Regole di cache per Apache 2.4: serve il modulo mod_headers.
@@ -38,8 +40,14 @@ const HTACCESS = `# File generato dal convertitore del catalogo Arno Plast (coma
     Header set Cache-Control "no-cache"
   </Files>
 
-  # Immagini e dati di un'edizione, una volta pubblicati, non cambiano più.
-  <FilesMatch "^(data\\.json|.+\\.webp)$">
+  # Anche il data.json di un'edizione può cambiare (un'edizione già pubblicata non si tocca più, ma
+  # il controllo è nel convertitore, non qui): il browser deve controllare sempre col server.
+  <FilesMatch "^data\\.json$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+
+  # Le immagini, il cui nome dipende dal loro contenuto, una volta pubblicate non cambiano mai.
+  <FilesMatch "\\.webp$">
     Header set Cache-Control "public, max-age=31536000, immutable"
   </FilesMatch>
 </IfModule>
@@ -147,15 +155,32 @@ export async function publishLine(store: RemoteStore, opts: PublishOptions): Pro
   const editionDir = join(buildDir, line, edition);
   const dataPath = join(editionDir, 'data.json');
   const dataBytes = await readBuiltData(dataPath, line, edition);
+  // Il testo esatto che si è validato e di cui si calcola l'impronta: si carica questo, senza rileggere il
+  // file (Ruling 18) — così non si rischia di pubblicare byte diversi da quelli controllati sopra.
+  const dataText = dataBytes.toString('utf8');
+  const dataHash = sha256Of(dataBytes);
 
   const root = ROOTS[env];
+  const remoteDataPath = `${root}/${line}/${edition}/data.json`;
+  // Ruling 18: un'edizione già pubblicata non cambia più contenuto (l'app può averlo salvato in locale
+  // fidandosi del numero di edizione); un `data.json` diverso con lo stesso numero si rifiuta, nulla si carica.
+  const remoteDataText = await store.readText(remoteDataPath);
+  const alreadyPublished = remoteDataText !== null;
+  if (alreadyPublished && sha256Of(Buffer.from(remoteDataText, 'utf8')) !== dataHash) {
+    throw new Error(
+      `edizione ${quote(edition)} di ${quote(line)} già pubblicata con un contenuto diverso: usa un nuovo numero di edizione per correggerla`,
+    );
+  }
+
   const imgDir = join(buildDir, line, 'img');
   for (const name of await listImages(imgDir)) {
     const remote = `${root}/${line}/img/${name}`;
     if (!(await store.exists(remote))) await store.upload(join(imgDir, name), remote);
   }
-  await store.upload(dataPath, `${root}/${line}/${edition}/data.json`);
-  await store.upload(join(editionDir, 'report.html'), `${root}/${line}/${edition}/report.html`);
+  if (!alreadyPublished) {
+    await store.writeText(remoteDataPath, dataText);
+    await store.upload(join(editionDir, 'report.html'), `${root}/${line}/${edition}/report.html`);
+  }
   if (!(await store.exists(`${root}/.htaccess`))) await store.writeText(`${root}/.htaccess`, HTACCESS);
 
   // L'indice si legge solo adesso, subito prima di riscriverlo: così non perde le linee pubblicate nel frattempo.
@@ -175,7 +200,7 @@ export async function publishLine(store: RemoteStore, opts: PublishOptions): Pro
       [line]: {
         edition,
         path: `${line}/${edition}/data.json`,
-        sha256: sha256Of(dataBytes),
+        sha256: dataHash,
         publishedAt: stamp,
         previous,
       },
