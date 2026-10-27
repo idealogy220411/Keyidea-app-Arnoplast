@@ -3,7 +3,7 @@
 - **Data:** 24 ottobre 2026
 - **Stato:** approvata
 - **Committente:** Idealogy / KeyIdea, per Arno Plast
-- **Bozze grafiche di riferimento:** `docs/mockups/bozze-v2.html`, `docs/mockups/icone-linee-v1.html`, `docs/mockups/bozze-v3-navigazione.html`
+- **Bozze grafiche di riferimento:** `docs/mockups/bozze-v2.html`, `docs/mockups/icone-linee-v1.html`, `docs/mockups/bozze-v3-navigazione.html`, `docs/mockups/icone-funzionali-v1.html`
 
 ## 1. Obiettivo
 
@@ -269,7 +269,7 @@ Riferimento: `docs/mockups/bozze-v2.html`.
   - nero `#231F20`;
   - giallo dei bollini materiale `#FFE500`.
 - **Carattere:** Lato (licenza libera OFL), incluso nell'app.
-- **Icone:** disegnate su misura nello stesso stile (tratto arrotondato), come in `docs/mockups/icone-linee-v1.html`.
+- **Icone:** disegnate su misura nello stesso stile (tratto arrotondato): quelle delle tre linee in `docs/mockups/icone-linee-v1.html`, quelle delle azioni (filtri, video, email, WhatsApp, lingua, stato catalogo, chi siamo, contatti, privacy) in `docs/mockups/icone-funzionali-v1.html`.
 - **Stile visivo:** direzione «A · Essenziale» (sfondo chiaro, fasce e pulsanti nel rosso del marchio, schede con foto grandi), scelta tra tre proposte grafiche di riferimento.
 - **Barra in basso, confermata:** le 5 voci già decise (Agricoltura, Garden, Olive, Cerca, Preferiti), con le icone scelte, nello stile «A · Essenziale» — vedi `docs/mockups/bozze-v3-navigazione.html`.
 - **Bozze v3:** prima di sviluppare l'interfaccia prepariamo le bozze v3 complete (tutte le schermate, nello stile e con la navigazione appena confermati), da approvare.
