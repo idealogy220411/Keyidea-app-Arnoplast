@@ -1,4 +1,4 @@
-import { REFERENCE_LANG, type LocalizedList, type LocalizedText, type Material } from '@arnoplast/schema';
+import { REFERENCE_LANG, type LineId, type LocalizedList, type LocalizedText, type Material } from '@arnoplast/schema';
 import type { AttachedLanguage, AttachedProduct } from './associate';
 import type { Issue } from './types';
 
@@ -125,8 +125,11 @@ function matchProducts(italian: AttachedProduct[], foreign: AttachedProduct[]): 
  * Unisce le estrazioni delle lingue in una sola linea. L'italiano dà struttura, ordine, numeri, materiali,
  * optional e immagini; le altre lingue aggiungono nomi, caratteristiche, dimensioni e descrizioni degli articoli
  * dei prodotti abbinati per codice. Dove una traduzione manca la chiave della lingua non c'è: l'app usa l'italiano.
+ *
+ * Gli identificativi dei prodotti sono `<linea>/<slug>` (l'app cerca tra le linee); quelli delle categorie
+ * restano solo lo slug, perché sono unici dentro una linea.
  */
-export function mergeLanguages(perLang: AttachedLanguage[]): MergedLine {
+export function mergeLanguages(perLang: AttachedLanguage[], line: LineId): MergedLine {
   const italian = perLang.find((entry) => entry.lang === REFERENCE_LANG);
   if (!italian) {
     throw new Error(`Manca la lingua di riferimento italiano («${REFERENCE_LANG}»): impossibile unire le lingue`);
@@ -147,7 +150,7 @@ export function mergeLanguages(perLang: AttachedLanguage[]): MergedLine {
   const products: MergedProduct[] = italian.products.map((product) => {
     // L'estrazione assegna sempre una categoria: i prodotti prima della prima categoria vengono scartati.
     const category = categoryByOrder.get(product.categoryOrder)!;
-    const id = uniqueId(slugify(product.name) || 'prodotto', takenProductIds);
+    const id = `${line}/${uniqueId(slugify(product.name) || 'prodotto', takenProductIds)}`;
     category.productIds.push(id);
     return {
       id,
@@ -189,17 +192,34 @@ export function mergeLanguages(perLang: AttachedLanguage[]): MergedLine {
 
       const merged = products[index];
       merged.name[lang] = match.name;
-      merged.features[lang] = [...match.features];
-      merged.dimensions[lang] = [...match.dimensions];
+      // Ruling 20: una chiave di lingua si scrive solo quando ha un contenuto; altrimenti resta assente
+      // e l'app usa l'italiano. Qui si segna anche cosa manca, per l'avviso di traduzione incompleta.
+      if (match.features.length > 0) merged.features[lang] = [...match.features];
+      if (match.dimensions.length > 0) merged.dimensions[lang] = [...match.dimensions];
 
       // Se un codice si ripete nel prodotto straniero vale la prima riga.
       const descriptions = new Map<string, string>();
       for (const article of match.articles) {
         if (!descriptions.has(article.code)) descriptions.set(article.code, article.description);
       }
+      const missingDescriptions: string[] = [];
       for (const article of merged.articles) {
         const description = descriptions.get(article.code);
-        if (description !== undefined) article.description[lang] = description;
+        if (description !== undefined && description.trim() !== '') article.description[lang] = description;
+        else missingDescriptions.push(article.code);
+      }
+
+      const emptyLists: string[] = [];
+      if (italianProduct.features.length > 0 && match.features.length === 0) emptyLists.push('caratteristiche');
+      if (italianProduct.dimensions.length > 0 && match.dimensions.length === 0) emptyLists.push('dimensioni');
+      if (missingDescriptions.length > 0 || emptyLists.length > 0) {
+        const details = [
+          missingDescriptions.length > 0 ? `descrizioni mancanti: ${missingDescriptions.join(', ')}` : null,
+          emptyLists.length > 0 ? `liste vuote: ${emptyLists.join(', ')}` : null,
+        ]
+          .filter((part): part is string => part !== null)
+          .join('; ');
+        warn(`traduzione incompleta (${lang}): ${italianProduct.name} (${details})`);
       }
 
       const categoryName = foreignCategoryNames.get(match.categoryOrder);

@@ -1,8 +1,12 @@
+import type { LineId } from '@arnoplast/schema';
 import { describe, expect, it } from 'vitest';
 import type { AttachedCategory, AttachedLanguage, AttachedProduct } from '../src/associate';
 import type { RawArticle } from '../src/extract';
 import { mergeLanguages, slugify } from '../src/merge';
 import type { Issue } from '../src/types';
+
+/** `mergeLanguages` con una linea di prova predefinita, per non doverla ripetere in ogni test. */
+const merge = (perLang: AttachedLanguage[], line: LineId = 'agricoltura') => mergeLanguages(perLang, line);
 
 const ANCHOR = { spreadIndex: 0, x: 0, y: 0 };
 
@@ -49,7 +53,7 @@ const PRISMA_CODES = ['1807-1351', '1807-1352'];
 
 /** Linea di prova con un solo prodotto Prisma in italiano, più le lingue indicate. */
 const prismaLine = (...others: AttachedLanguage[]) =>
-  mergeLanguages([
+  merge([
     language('it', [category('COPRIPALO', 0)], [product({ name: 'COPRIPALO PRISMA', codes: PRISMA_CODES })]),
     ...others,
   ]);
@@ -64,6 +68,22 @@ describe('mergeLanguages', () => {
     expect(result.products).toHaveLength(1);
     expect(result.products[0].name).toEqual({ it: 'COPRIPALO PRISMA', en: 'POST CAP PRISMA' });
     expect(result.issues).toEqual([]);
+  });
+
+  it('prefixes product ids with the line, but leaves category ids alone', () => {
+    const italian = language(
+      'it',
+      [category('COPRIPALO', 0)],
+      [product({ name: 'COPRIPALO PRISMA', codes: PRISMA_CODES })],
+    );
+
+    const agricoltura = merge([italian], 'agricoltura');
+    const garden = merge([italian], 'garden');
+
+    expect(agricoltura.products[0].id).toBe('agricoltura/copripalo-prisma');
+    expect(garden.products[0].id).toBe('garden/copripalo-prisma');
+    expect(agricoltura.categories[0].id).toBe('copripalo');
+    expect(garden.categories[0].id).toBe('copripalo');
   });
 
   it('merges article descriptions per code', () => {
@@ -91,7 +111,7 @@ describe('mergeLanguages', () => {
       ],
     );
 
-    const result = mergeLanguages([italian, english]);
+    const result = merge([italian, english]);
 
     expect(result.products[0].articles.map((a) => [a.code, a.description])).toEqual([
       ['1807-1351', { it: 'Coprip. 60x60', en: 'Cap 60x60' }],
@@ -105,6 +125,52 @@ describe('mergeLanguages', () => {
     const [first, second] = result.products[0].articles;
     expect(first.description).toEqual({ it: 'Descrizione 1807-1351', en: 'Descrizione 1807-1351' });
     expect(second.description).toEqual({ it: 'Descrizione 1807-1352' });
+  });
+
+  it('warns about incomplete translations: missing article descriptions and empty lists', () => {
+    const italian = language(
+      'it',
+      [category('COPRIPALO', 0)],
+      [
+        product({
+          name: 'COPRIPALO PRISMA',
+          features: ['Robusto'],
+          dimensions: ['Ø 6 cm'],
+          codes: PRISMA_CODES,
+        }),
+      ],
+    );
+    const english = language(
+      'en',
+      [category('POST CAPS', 0)],
+      [
+        product({
+          name: 'POST CAP PRISMA',
+          features: [],
+          dimensions: [],
+          codes: [],
+          articles: [article(PRISMA_CODES[0], 'Post cap 60x60'), article(PRISMA_CODES[1], '  ')],
+        }),
+      ],
+    );
+
+    const result = merge([italian, english]);
+
+    const [merged] = result.products;
+    expect(merged.articles.map((a) => a.description)).toEqual([
+      { it: `Descrizione ${PRISMA_CODES[0]}`, en: 'Post cap 60x60' },
+      // Descrizione vuota (anche solo spazi): la chiave `en` resta assente.
+      { it: `Descrizione ${PRISMA_CODES[1]}` },
+    ]);
+    expect(merged.features).toEqual({ it: ['Robusto'] });
+    expect(merged.dimensions).toEqual({ it: ['Ø 6 cm'] });
+    expect(result.issues).toEqual([
+      {
+        level: 'warning',
+        where: 'en',
+        message: `traduzione incompleta (en): COPRIPALO PRISMA (descrizioni mancanti: ${PRISMA_CODES[1]}; liste vuote: caratteristiche, dimensioni)`,
+      },
+    ]);
   });
 
   it('takes quantities, materials, optional codes and links from the Italian product', () => {
@@ -138,7 +204,7 @@ describe('mergeLanguages', () => {
       ],
     );
 
-    const [merged] = mergeLanguages([italian, english]).products;
+    const [merged] = merge([italian, english]).products;
 
     expect(merged.materials).toEqual(['PE', 'FE']);
     expect(merged.optionalCodes).toEqual(['1807-1352']);
@@ -162,14 +228,21 @@ describe('mergeLanguages', () => {
       [product({ name: 'POST CAP PRISMA', codes: PRISMA_CODES, features: ['Sturdy'], dimensions: [] })],
     );
 
-    const [prisma, qubo] = mergeLanguages([italian, english]).products;
+    const result = merge([italian, english]);
+    const [prisma, qubo] = result.products;
 
     expect(prisma.features).toEqual({ it: ['Robusto'], en: ['Sturdy'] });
-    expect(prisma.dimensions).toEqual({ it: ['Ø 6 cm'], en: [] });
+    // Dimensioni vuote in inglese: la chiave `en` manca (non un elenco vuoto), l'app userà l'italiano.
+    expect(prisma.dimensions).toEqual({ it: ['Ø 6 cm'] });
     // Nessuna corrispondenza in inglese: la chiave `en` manca, l'app userà l'italiano.
     expect(qubo.name).toEqual({ it: 'COPRIPALO QUBO' });
     expect(qubo.features).toEqual({ it: [] });
     expect(qubo.dimensions).toEqual({ it: [] });
+
+    expect(result.issues).toEqual([
+      { level: 'warning', message: 'traduzione incompleta (en): COPRIPALO PRISMA (liste vuote: dimensioni)', where: 'en' },
+      { level: 'warning', message: 'traduzione mancante (en): COPRIPALO QUBO', where: 'en' },
+    ]);
   });
 
   it('warns on product only in foreign language', () => {
@@ -202,7 +275,7 @@ describe('mergeLanguages', () => {
       ],
     );
 
-    const result = mergeLanguages([italian, prismaIn('en', 'POST CAP PRISMA')]);
+    const result = merge([italian, prismaIn('en', 'POST CAP PRISMA')]);
 
     expect(result.issues).toHaveLength(1);
     expect(result.issues[0]).toMatchObject({ level: 'warning', where: 'en' });
@@ -231,7 +304,7 @@ describe('mergeLanguages', () => {
       ],
     );
 
-    const result = mergeLanguages([italian, english]);
+    const result = merge([italian, english]);
 
     expect(result.categories).toHaveLength(1);
     expect(result.categories[0].name).toEqual({ it: 'COPRIPALO', en: 'POST CAPS' });
@@ -256,7 +329,7 @@ describe('mergeLanguages', () => {
       ],
     );
 
-    const result = mergeLanguages([italian, english]);
+    const result = merge([italian, english]);
 
     expect(result.categories[0].name).toEqual({ it: 'COPRIPALO', en: 'POST CAPS' });
     expect(result.categories[1].name).toEqual({ it: 'ACCESSORI' });
@@ -273,10 +346,18 @@ describe('mergeLanguages', () => {
       ],
     );
 
-    const result = mergeLanguages([italian]);
+    const result = merge([italian]);
 
-    expect(result.products.map((p) => p.id)).toEqual(['copripalo', 'copripalo-2', 'copripalo-3']);
-    expect(result.categories[0].productIds).toEqual(['copripalo', 'copripalo-2', 'copripalo-3']);
+    expect(result.products.map((p) => p.id)).toEqual([
+      'agricoltura/copripalo',
+      'agricoltura/copripalo-2',
+      'agricoltura/copripalo-3',
+    ]);
+    expect(result.categories[0].productIds).toEqual([
+      'agricoltura/copripalo',
+      'agricoltura/copripalo-2',
+      'agricoltura/copripalo-3',
+    ]);
   });
 
   it('falls back to a generic id when the name has no letters or digits', () => {
@@ -289,12 +370,12 @@ describe('mergeLanguages', () => {
       ],
     );
 
-    const result = mergeLanguages([italian]);
+    const result = merge([italian]);
 
     expect(result.categories.map((c) => c.id)).toEqual(['categoria', 'categoria-2']);
     expect(result.products.map((p) => [p.id, p.categoryId])).toEqual([
-      ['prodotto', 'categoria'],
-      ['prodotto-2', 'categoria-2'],
+      ['agricoltura/prodotto', 'categoria'],
+      ['agricoltura/prodotto-2', 'categoria-2'],
     ]);
   });
 
@@ -309,7 +390,7 @@ describe('mergeLanguages', () => {
       ],
     );
 
-    const result = mergeLanguages([italian]);
+    const result = merge([italian]);
 
     expect(result.categories).toEqual([
       {
@@ -317,14 +398,20 @@ describe('mergeLanguages', () => {
         name: { it: 'Accessori, PET e ricambi' },
         order: 3,
         imageLink: 'file:/a/cat.jpg',
-        productIds: ['mon-block', 'tappo'],
+        productIds: ['agricoltura/mon-block', 'agricoltura/tappo'],
       },
-      { id: 'copripalo', name: { it: 'COPRIPALO' }, order: 5, imageLink: null, productIds: ['copripalo-prisma'] },
+      {
+        id: 'copripalo',
+        name: { it: 'COPRIPALO' },
+        order: 5,
+        imageLink: null,
+        productIds: ['agricoltura/copripalo-prisma'],
+      },
     ]);
     expect(result.products.map((p) => [p.id, p.categoryId])).toEqual([
-      ['mon-block', 'accessori-pet-e-ricambi'],
-      ['copripalo-prisma', 'copripalo'],
-      ['tappo', 'accessori-pet-e-ricambi'],
+      ['agricoltura/mon-block', 'accessori-pet-e-ricambi'],
+      ['agricoltura/copripalo-prisma', 'copripalo'],
+      ['agricoltura/tappo', 'accessori-pet-e-ricambi'],
     ]);
   });
 
@@ -338,7 +425,7 @@ describe('mergeLanguages', () => {
       ],
     );
 
-    const result = mergeLanguages([italian]);
+    const result = merge([italian]);
 
     expect(result.categories.map((c) => c.id)).toEqual(['accessori', 'accessori-2']);
     expect(result.products.map((p) => p.categoryId)).toEqual(['accessori', 'accessori-2']);
@@ -366,7 +453,7 @@ describe('mergeLanguages', () => {
       ],
     );
 
-    const result = mergeLanguages([italian, english]);
+    const result = merge([italian, english]);
 
     expect(result.products.map((p) => p.name)).toEqual([
       { it: 'UNO' },
@@ -392,19 +479,20 @@ describe('mergeLanguages', () => {
       ],
     );
 
-    const result = mergeLanguages([italian, english]);
+    const result = merge([italian, english]);
 
     // ONE-B e ONE-C condividono 2 codici: a parità vince il primo, ONE-B.
     expect(result.products[0].name).toEqual({ it: 'UNO', en: 'ONE-B' });
     expect(result.issues.map((issue) => issue.message)).toEqual([
       'prodotto presente solo in en: ONE-A',
       'prodotto presente solo in en: ONE-C',
+      'traduzione incompleta (en): UNO (descrizioni mancanti: 1807-0003)',
     ]);
     expect(result.issues.every((issue) => issue.level === 'warning' && issue.where === 'en')).toBe(true);
   });
 
   it('lists the Italian language first and then the others in input order', () => {
-    const result = mergeLanguages([
+    const result = merge([
       prismaIn('es', 'TAPA PRISMA'),
       language('it', [category('COPRIPALO', 0)], [product({ name: 'COPRIPALO PRISMA', codes: PRISMA_CODES })]),
       prismaIn('en', 'POST CAP PRISMA'),
@@ -431,7 +519,7 @@ describe('mergeLanguages', () => {
       ],
     );
 
-    const result = mergeLanguages([english, italian]);
+    const result = merge([english, italian]);
 
     expect(result.issues).toEqual([
       { level: 'warning', message: 'Materiale sconosciuto «XX»', where: 'it: spread 1' },
@@ -444,8 +532,8 @@ describe('mergeLanguages', () => {
   });
 
   it('throws when the Italian language is missing', () => {
-    expect(() => mergeLanguages([prismaIn('en', 'POST CAP PRISMA')])).toThrow(/italiano/);
-    expect(() => mergeLanguages([])).toThrow(/italiano/);
+    expect(() => merge([prismaIn('en', 'POST CAP PRISMA')])).toThrow(/italiano/);
+    expect(() => merge([])).toThrow(/italiano/);
   });
 });
 
