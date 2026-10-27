@@ -1,6 +1,7 @@
 import { copyFile, mkdir, readFile, rename, stat, writeFile } from 'node:fs/promises';
 import { dirname, join, posix } from 'node:path';
 import SftpClient from 'ssh2-sftp-client';
+import { fingerprintProblem, sha256Fingerprint } from './fingerprint';
 
 /**
  * Il posto in cui si pubblica il catalogo. I percorsi sono relativi alla radice del sito, con `/` come separatore.
@@ -83,6 +84,11 @@ export class LocalStore implements RemoteStore {
 
 type SftpSettings = { host: string; port: number; username: string; root: string; password?: string; keyPath?: string };
 
+/** Pacchetti SSH-level ogni 10 secondi: tengono viva la connessione sugli hosting che chiudono quelle ferme. */
+const KEEPALIVE_INTERVAL_MS = 10_000;
+/** Tempo massimo per l'handshake SSH prima di rinunciare. */
+const READY_TIMEOUT_MS = 20_000;
+
 /** Legge le variabili d'ambiente dell'hosting. Se ne mancano, lo dice prima di aprire qualunque connessione. */
 function readSftpSettings(env: NodeJS.ProcessEnv): SftpSettings {
   const { ARNO_SFTP_HOST: host, ARNO_SFTP_USER: username, ARNO_SFTP_ROOT: root } = env;
@@ -129,12 +135,31 @@ export class SftpStore implements RemoteStore {
       });
     }
 
+    // Ruling 16: con l'autenticazione a password una chiave host non verificata espone le credenziali
+    // dell'hosting; l'impronta attesa è controllata qui, prima di fidarsi del server.
+    const expectedFingerprint = env.ARNO_SFTP_HOST_FINGERPRINT || undefined;
+    let problem: string | null = null;
+    const hostVerifier = (hostKey: Buffer): boolean => {
+      problem = fingerprintProblem(expectedFingerprint, sha256Fingerprint(hostKey));
+      return problem === null;
+    };
+
     // Di serie la libreria scrive sullo schermo a ogni chiusura della connessione; gli errori arrivano comunque
     // alla chiamata che li causa.
     const client = new SftpClient('arnoplast', { error: () => {}, end: () => {}, close: () => {} });
     try {
-      await client.connect({ host, port, username, password, privateKey });
+      await client.connect({
+        host,
+        port,
+        username,
+        password,
+        privateKey,
+        hostVerifier,
+        keepaliveInterval: KEEPALIVE_INTERVAL_MS,
+        readyTimeout: READY_TIMEOUT_MS,
+      });
     } catch (error) {
+      if (problem) throw new Error(problem);
       throw new Error(`connessione SFTP a ${host}:${port} non riuscita: ${reason(error)}`);
     }
     return new SftpStore(client, root);
