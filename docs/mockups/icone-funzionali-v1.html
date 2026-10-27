@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Icone funzionali app Arnoplast</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --brand:#ED1C24; --ink:#231F20; --muted:#6E6A6B; --line:#E4E2E2; --card:#FFFFFF; --soft:#FDECEC;
+  --page:#E8E7E7; --page-text:#231F20; --page-muted:#5E5A5B; --panel:#FFFFFF; --ok:#1F8A4C; --chip:#F1F0F0;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){ --page:#151414; --page-text:#EDEBEB; --page-muted:#A8A3A4; --panel:#211E1F; --line:#3A3637; --soft:#3A1E1F; --chip:#2C2829; }
+}
+:root[data-theme="dark"]{ --page:#151414; --page-text:#EDEBEB; --page-muted:#A8A3A4; --panel:#211E1F; --line:#3A3637; --soft:#3A1E1F; --chip:#2C2829; }
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--page);color:var(--page-text);font-family:"Lato",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:var(--brand)} a:hover{color:#C8161D}
+.wrap{max-width:1180px;margin:0 auto;padding:40px 20px 80px}
+h1{font-size:27px;font-weight:900;margin:0 0 8px}
+.lead{color:var(--page-muted);font-size:15px;line-height:1.6;max-width:780px;margin:0}
+.quickgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-top:30px}
+.qtile{background:var(--panel);border-radius:16px;padding:18px 10px 16px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.qtile .tile{width:56px;height:56px;border-radius:16px;background:var(--soft);color:var(--brand);display:flex;align-items:center;justify-content:center}
+.qtile .tile svg{width:30px;height:30px}
+.qtile b{font-size:12.5px;font-weight:900;color:var(--page-text)}
+.qtile span{font-size:11px;color:var(--page-muted);line-height:1.35}
+.section{background:var(--panel);border-radius:20px;padding:26px 26px 30px;margin-top:28px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.section h2{font-size:18px;font-weight:900;display:flex;align-items:center;gap:10px;color:var(--page-text)}
+.section h2 .num{width:26px;height:26px;border-radius:50%;background:var(--brand);color:#fff;font-size:13px;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.section .desc{color:var(--page-muted);font-size:13.5px;line-height:1.6;margin:10px 0 22px;max-width:780px}
+.mock{background:var(--page);border-radius:18px;padding:22px;display:flex;flex-wrap:wrap;gap:28px;align-items:flex-start}
+.phone{width:300px;background:var(--panel);border-radius:22px;padding:14px;box-shadow:0 2px 10px rgba(0,0,0,.1);flex-shrink:0}
+.cap{font-size:11.5px;color:var(--page-muted);margin-top:10px;text-align:center}
+.searchbar{display:flex;align-items:center;gap:10px;background:var(--chip);border-radius:12px;padding:10px 12px;color:var(--page-muted);font-size:13px}
+.searchbar svg{width:18px;height:18px;flex-shrink:0}
+.ibtn{width:38px;height:38px;border-radius:11px;background:var(--soft);color:var(--brand);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.ibtn svg{width:20px;height:20px}
+.sheet{margin-top:14px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
+.sheet .srow{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.sheet .srow b{font-size:13px;font-weight:900}
+.chips{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:12px}
+.chip{font-size:11.5px;font-weight:700;padding:6px 11px;border-radius:999px;background:var(--chip);color:var(--page-text)}
+.chip.on{background:var(--brand);color:#fff}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;font-size:12.5px;font-weight:700;padding-top:10px;border-top:1px solid var(--line)}
+.toggle{width:38px;height:22px;border-radius:999px;background:var(--brand);position:relative;flex-shrink:0}
+.toggle i{position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:#fff;display:block}
+.card{width:220px;background:var(--panel);border-radius:16px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08);flex-shrink:0}
+.thumb{height:150px;background:linear-gradient(135deg,var(--chip),var(--line));position:relative;display:flex;align-items:center;justify-content:center;color:var(--page-muted);font-size:11px}
+.playbadge{position:absolute;right:10px;bottom:10px;width:34px;height:34px;border-radius:50%;background:rgba(35,31,32,.72);color:#fff;display:flex;align-items:center;justify-content:center}
+.playbadge svg{width:18px;height:18px}
+.cardbody{padding:12px 14px 14px}
+.cardbody b{font-size:13px;display:block}
+.cardbody span{font-size:11.5px;color:var(--page-muted)}
+.favbar{display:flex;flex-direction:column;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px}
+.favbar b{font-size:13.5px;font-weight:900}
+.favbar p{font-size:12px;color:var(--page-muted);margin:2px 0 4px;line-height:1.5}
+.sendbtn{display:flex;align-items:center;gap:10px;padding:11px 14px;border-radius:12px;font-size:13.5px;font-weight:900;color:#fff}
+.sendbtn svg{width:19px;height:19px}
+.sendbtn.mail{background:var(--brand)}
+.sendbtn.wa{background:var(--ink)}
+.topbar{display:flex;align-items:center;justify-content:space-between;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:10px 12px}
+.topbar b{font-size:13.5px;font-weight:900}
+.menulist{margin-top:14px;background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.mrow{display:flex;align-items:center;gap:12px;padding:13px 14px;border-bottom:1px solid var(--line)}
+.mrow:last-child{border-bottom:none}
+.mrow .mi{width:34px;height:34px;border-radius:10px;background:var(--soft);color:var(--brand);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.mrow .mi svg{width:18px;height:18px}
+.mrow .mt{flex:1}
+.mrow .mt b{font-size:13px;display:block;font-weight:900}
+.mrow .mt span{font-size:11.5px;color:var(--page-muted)}
+.mrow .chev{width:16px;height:16px;color:var(--page-muted);flex-shrink:0}
+.foot{font-size:11px;color:var(--page-muted);text-align:center;margin-top:12px}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="f-filtri" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></g><circle cx="9" cy="6" r="2.1" fill="currentColor"/><circle cx="15.5" cy="12" r="2.1" fill="currentColor"/><circle cx="7.5" cy="18" r="2.1" fill="currentColor"/></symbol>
+    <symbol id="f-video" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M10.1 8.6l6 3.4-6 3.4z" fill="currentColor"/></symbol>
+    <symbol id="f-email" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2.8" y="5.5" width="18.4" height="13" rx="2.4"/><path d="M3.5 6.5l8.5 7 8.5-7"/></g></symbol>
+    <symbol id="f-whatsapp" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l1.1-3.8A8 8 0 1 1 8.4 19z"/><path d="M9.3 9.6c.3-.6.6-.6.9-.6.2 0 .4 0 .6.4.2.5.7 1.6.8 1.7.1.2.1.3 0 .5-.1.2-.2.3-.4.5-.2.2-.4.4-.2.7.2.4 1 1.4 2.1 2 .2.1.4.1.6-.1.2-.2.5-.6.7-.8.2-.2.3-.2.5-.1.2.1 1.4.7 1.7.8.2.1.4.2.4.3.1.2 0 .9-.3 1.3-.3.4-1.1.8-1.8.8-.6 0-1.6-.2-3-1-2.6-1.4-4.3-4-4.4-4.2-.1-.2-.9-1.3-.9-2.4 0-1.1.6-1.7.8-1.9z"/></g></symbol>
+    <symbol id="f-info" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.3"/><line x1="12" y1="11" x2="12" y2="16.5"/></g><circle cx="12" cy="7.6" r="1.15" fill="currentColor"/></symbol>
+    <symbol id="f-lingua" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.3"/><path d="M2.7 12h18.6"/><path d="M12 2.7c2.6 2.4 4 5.7 4 9.3s-1.4 6.9-4 9.3c-2.6-2.4-4-5.7-4-9.3s1.4-6.9 4-9.3z"/></g></symbol>
+    <symbol id="f-catalogo" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18.5a4.3 4.3 0 0 1-1-8.5 5.3 5.3 0 0 1 10.2-1.7A4.1 4.1 0 0 1 17 18.5z"/><path d="M9 14.2l1.9 1.9 4-4"/></g></symbol>
+    <symbol id="f-chisiamo" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4.5" width="14" height="16" rx="1.2"/><line x1="2.5" y1="20.5" x2="21.5" y2="20.5"/><line x1="8.3" y1="8.2" x2="8.3" y2="8.2"/><line x1="12" y1="8.2" x2="12" y2="8.2"/><line x1="15.7" y1="8.2" x2="15.7" y2="8.2"/><line x1="8.3" y1="11.8" x2="8.3" y2="11.8"/><line x1="12" y1="11.8" x2="12" y2="11.8"/><line x1="15.7" y1="11.8" x2="15.7" y2="11.8"/><path d="M9.5 20.5V16h5v4.5"/></g></symbol>
+    <symbol id="f-contatti" viewBox="0 0 24 24"><path d="M5.5 4.5h3l1.3 4.3-2 1.6a12 12 0 0 0 5.8 5.8l1.6-2 4.3 1.3v3a1.6 1.6 0 0 1-1.7 1.6A16.5 16.5 0 0 1 3.9 6.2a1.6 1.6 0 0 1 1.6-1.7z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="f-privacy" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.2l7 2.6v5.4c0 5-3 8.3-7 9.6-4-1.3-7-4.6-7-9.6V5.8z"/><path d="M9 12.2l2.1 2.1L15.3 10"/></g></symbol>
+    <symbol id="f-search" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 20 20"/></g></symbol>
+    <symbol id="f-chev" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  </defs>
+</svg>
+
+<div class="wrap">
+
+  <h1>Icone funzionali · proposta</h1>
+  <p class="lead">Quattro nuove icone per azioni che oggi, nelle bozze, non hanno ancora un simbolo: filtrare la ricerca, riconoscere un prodotto con video, inviare la richiesta preferiti via email o WhatsApp, e le voci del menu informazioni. Stesso stile delle icone di linea già proposte: tratto arrotondato, colore rosso Arno Plast.</p>
+
+  <div class="quickgrid">
+    <div class="qtile"><div class="tile"><svg><use href="#f-filtri"/></svg></div><b>Filtri</b><span>apre il pannello filtri</span></div>
+    <div class="qtile"><div class="tile"><svg><use href="#f-video"/></svg></div><b>Video</b><span>prodotto con video</span></div>
+    <div class="qtile"><div class="tile"><svg><use href="#f-email"/></svg></div><b>Email</b><span>invia richiesta</span></div>
+    <div class="qtile"><div class="tile"><svg><use href="#f-whatsapp"/></svg></div><b>WhatsApp</b><span>invia richiesta</span></div>
+    <div class="qtile"><div class="tile"><svg><use href="#f-info"/></svg></div><b>Info</b><span>apre il menu</span></div>
+    <div class="qtile"><div class="tile"><svg><use href="#f-lingua"/></svg></div><b>Lingua</b><span>cambia lingua</span></div>
+    <div class="qtile"><div class="tile"><svg><use href="#f-catalogo"/></svg></div><b>Stato catalogo</b><span>edizione e offline</span></div>
+    <div class="qtile"><div class="tile"><svg><use href="#f-chisiamo"/></svg></div><b>Chi siamo</b><span>pagina azienda</span></div>
+    <div class="qtile"><div class="tile"><svg><use href="#f-contatti"/></svg></div><b>Contatti</b><span>pagina contatti</span></div>
+    <div class="qtile"><div class="tile"><svg><use href="#f-privacy"/></svg></div><b>Privacy</b><span>informativa</span></div>
+  </div>
+
+  <div class="section">
+    <h2><span class="num">1</span>Filtri di ricerca</h2>
+    <p class="desc">Il pulsante filtri si affianca alla barra di ricerca. Apre un pannello con i filtri per linea, categoria, materiale e la possibilità di mostrare solo i prodotti con video.</p>
+    <div class="mock">
+      <div class="phone">
+        <div class="searchbar"><svg><use href="#f-search"/></svg><span>Cerca per codice o nome…</span></div>
+        <div class="sheet">
+          <div class="srow"><b>Filtri</b><div class="ibtn" style="width:28px;height:28px;border-radius:8px"><svg style="width:15px;height:15px"><use href="#f-filtri"/></svg></div></div>
+          <div class="chips"><span class="chip on">Agricoltura</span><span class="chip">Garden</span><span class="chip">Olive</span></div>
+          <div class="chips"><span class="chip">Reti</span><span class="chip on">Pali e sostegni</span><span class="chip">Teli</span><span class="chip">Legacci</span></div>
+          <div class="chips"><span class="chip">Polipropilene</span><span class="chip">HDPE</span><span class="chip on">Metallo</span></div>
+          <div class="toggle-row"><span>Solo con video</span><div class="toggle"><i></i></div></div>
+        </div>
+      </div>
+      <div class="phone" style="width:150px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px">
+        <div class="ibtn" style="width:52px;height:52px;border-radius:16px"><svg style="width:28px;height:28px"><use href="#f-filtri"/></svg></div>
+        <span class="cap">Pulsante filtri<br>nella barra di ricerca</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2><span class="num">2</span>Video prodotto</h2>
+    <p class="desc">Quando il QR code del catalogo stampato rimanda a un video, la scheda prodotto mostra un distintivo play sopra l'immagine, così l'utente sa che può guardarlo prima ancora di aprire la scheda.</p>
+    <div class="mock">
+      <div class="card">
+        <div class="thumb">immagine prodotto<div class="playbadge"><svg><use href="#f-video"/></svg></div></div>
+        <div class="cardbody"><b>Copripalo Prisma</b><span>Agricoltura · con video</span></div>
+      </div>
+      <div class="card">
+        <div class="thumb">immagine prodotto</div>
+        <div class="cardbody"><b>Rete ombreggiante</b><span>Garden</span></div>
+      </div>
+      <div class="phone" style="width:160px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px">
+        <div class="playbadge" style="position:static;background:var(--brand)"><svg><use href="#f-video"/></svg></div>
+        <span class="cap">Distintivo video<br>sulla miniatura</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2><span class="num">3</span>Richiesta preferiti via email e WhatsApp</h2>
+    <p class="desc">Dalla pagina Preferiti, l'utente invia l'elenco dei codici salvati scegliendo tra email e WhatsApp dell'ufficio commerciale. Due pulsanti distinti, stesso peso visivo.</p>
+    <div class="mock">
+      <div class="phone">
+        <div class="favbar">
+          <b>3 prodotti nei preferiti</b>
+          <p>Invia la richiesta di informazioni con l'elenco dei codici.</p>
+          <div class="sendbtn mail"><svg><use href="#f-email"/></svg>Invia via email</div>
+          <div class="sendbtn wa"><svg><use href="#f-whatsapp"/></svg>Invia via WhatsApp</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2><span class="num">4</span>Pulsante informazioni e menu</h2>
+    <p class="desc">In alto a destra, il pulsante informazioni apre l'elenco con lingua, stato del catalogo, Chi siamo, Contatti, informativa privacy e versione dell'app — ognuna con la propria icona.</p>
+    <div class="mock">
+      <div class="phone">
+        <div class="topbar"><b>Agricoltura</b><div class="ibtn"><svg><use href="#f-info"/></svg></div></div>
+        <div class="menulist">
+          <div class="mrow"><div class="mi"><svg><use href="#f-lingua"/></svg></div><div class="mt"><b>Lingua</b><span>Italiano</span></div><svg class="chev"><use href="#f-chev"/></svg></div>
+          <div class="mrow"><div class="mi"><svg><use href="#f-catalogo"/></svg></div><div class="mt"><b>Stato catalogo</b><span>Edizione 2026.1 · disponibile offline</span></div><svg class="chev"><use href="#f-chev"/></svg></div>
+          <div class="mrow"><div class="mi"><svg><use href="#f-chisiamo"/></svg></div><div class="mt"><b>Chi siamo</b></div><svg class="chev"><use href="#f-chev"/></svg></div>
+          <div class="mrow"><div class="mi"><svg><use href="#f-contatti"/></svg></div><div class="mt"><b>Contatti</b></div><svg class="chev"><use href="#f-chev"/></svg></div>
+          <div class="mrow"><div class="mi"><svg><use href="#f-privacy"/></svg></div><div class="mt"><b>Informativa privacy</b></div><svg class="chev"><use href="#f-chev"/></svg></div>
+        </div>
+        <div class="foot">Versione 1.0.0</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
