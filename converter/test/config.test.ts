@@ -44,7 +44,7 @@ it('config: loads the default file', async () => {
   expect(config.lines.agricoltura.name).toEqual({ it: 'Agricoltura', en: 'Agriculture' });
   expect(config.lines.garden.name).toEqual({ it: 'Garden', en: 'Garden' });
   expect(config.lines.olive.name).toEqual({ it: 'Raccolta olive', en: 'Olive harvesting' });
-  expect(config.categories.agricoltura).toHaveLength(1);
+  expect(config.categories.agricoltura).toHaveLength(7);
   expect(config.categories.agricoltura[0]).toEqual({ id: 'copripalo', name: { it: 'Copripalo', en: 'Post caps' } });
   expect(config.drawingExtensions).toEqual(['.ai', '.pdf', '.eps', '.svg']);
   expect(new RegExp(config.optionalPattern, 'i').test('Dado a griffe M6 (optional)')).toBe(true);

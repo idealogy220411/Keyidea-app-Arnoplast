@@ -37,6 +37,42 @@ agricoltura-2026.1/
 - Si elaborano solo le lingue elencate in `catalogo.config.yaml`; le altre cartelle vengono ignorate, con un avviso.
 - Le immagini si leggono solo da `it/Links`: le altre lingue usano le stesse.
 
+## Come il convertitore riconosce il contenuto (`catalogo.config.yaml`)
+
+Il pacchetto InDesign reale della linea Agricoltura (ottobre 2026) non usa stili di paragrafo dedicati: tutto
+il testo ha lo stesso stile «normale». Il convertitore riconosce quindi il ruolo di ogni testo dal solo **stile
+di carattere** (`styles.product` per i titoli, `styles.entry` per le righe sotto) oppure, dove non c'è nemmeno
+quello, dal **contenuto**:
+
+- **Titolo di prodotto** (`styles.product`): apre un nuovo prodotto nella categoria corrente — a meno che il
+  testo non corrisponda a una delle intestazioni sotto, nel qual caso non è un titolo.
+- **Intestazioni «CARATTERISTICHE» / «DIMENSIONI»** (`styles.featuresHeading` / `styles.dimensionsHeading`,
+  per lingua): stesso stile di un titolo, ma il testo è quello configurato; aprono rispettivamente l'elenco
+  delle caratteristiche e delle dimensioni del prodotto corrente. Le righe che seguono, in stile
+  `styles.entry`, vanno nell'uno o nell'altro elenco a seconda dell'ultima intestazione incontrata.
+- **Intestazione «OPTIONAL DI FISSAGGIO»** (`styles.optionalFixingHeading`, per lingua): apre l'elenco degli
+  optional di fissaggio del prodotto corrente. Ogni titolo «puro» (stesso stile di un titolo di prodotto) che
+  segue, finché non si incontra un frame di tipo diverso (una riga di caratteristica/dimensione, un bollino
+  materiale, una tabella o si passa a un prodotto successivo), è il **nome** di un optional di fissaggio
+  (campo `fixingOptions` del prodotto, testo libero per lingua) e non l'inizio di un nuovo prodotto.
+- **Categoria**: non ha uno stile dedicato e non esiste una pagina di apertura con il nome in grande. Si
+  dichiara in `categories.<linea>` (identificativo e nome per lingua, come già si fa per `lines`) e si
+  riconosce quando un frame **senza stile di carattere** contiene, a meno di maiuscole/minuscole, uno dei nomi
+  dichiarati: da lì la categoria corrente è quella, finché non se ne incontra un'altra. Se la stessa etichetta
+  si ripresenta più avanti nel documento (per esempio perché compare già nella pagina indice, prima di tutti i
+  prodotti), il convertitore **non crea una categoria duplicata**: riattiva quella già dichiarata e sposta la
+  sua posizione sull'ultima comparsa.
+- **Materiale** (FE, FV, PA, PET, PE, PP, PVC): anche questo senza stile dedicato. Un frame senza stile di
+  carattere il cui contenuto è esattamente una di queste sigle è un bollino materiale del prodotto corrente;
+  qualunque altro testo senza stile (didascalie, note...) che non corrisponda né a una categoria né a un
+  materiale viene semplicemente ignorato.
+
+Chi prepara `catalogo.config.yaml` per una nuova linea o una nuova edizione deve quindi: verificare i nomi
+degli stili di carattere nel file IDML (`styles.product`, `styles.entry`), il testo esatto delle tre
+intestazioni per ogni lingua, ed elencare in `categories.<linea>` le categorie con cui il catalogo cartaceo
+apre ogni sezione (l'ordine qui non conta: conta solo il nome, per il riconoscimento). Le linee `garden` e
+`olive` hanno ancora valori segnaposto, da correggere quando arriverà il rispettivo pacchetto reale.
+
 ## Comando `build`
 
 ```bash

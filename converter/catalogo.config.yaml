@@ -30,10 +30,22 @@ lines:
 # (confronto senza maiuscole/minuscole): l'ordine con cui le categorie finiscono nei dati pubblicati
 # resta quello con cui le etichette compaiono leggendo il documento, non quello scritto qui.
 categories:
-  # Segnaposto: da correggere con le categorie reali lette dall'indice del catalogo 2026.1.
+  # Le 7 categorie reali della linea Agricoltura, lette dall'indice del catalogo 2026.1.
   agricoltura:
     - id: copripalo
       name: { it: Copripalo, en: Post caps }
+    - id: sistemi-di-legatura
+      name: { it: Sistemi di legatura, en: Tying systems }
+    - id: accessori-pet-e-ricambi
+      name: { it: 'Accessori, PET e ricambi', en: 'Accessories, PET and spare parts' }
+    - id: ferma-teli-e-reti
+      name: { it: Ferma-teli e reti, en: Sheet and net fixings }
+    - id: placchette
+      name: { it: Placchette, en: Plates }
+    - id: moschettoni-e-tiranti
+      name: { it: Moschettoni e tiranti, en: Snap hooks and tie rods }
+    - id: ancoraggi-ganci-e-chiodi
+      name: { it: 'Ancoraggi, ganci e chiodi', en: 'Anchors, hooks and nails' }
   # Segnaposto: da correggere quando arriverà il pacchetto reale della linea Garden.
   garden:
     - id: copripalo
