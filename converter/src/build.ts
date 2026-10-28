@@ -98,6 +98,7 @@ async function findLanguageInputs(inputDir: string, languages: string[], issues:
 async function readLanguage(
   { lang, idmlPath }: LanguageInput,
   config: ConverterConfig,
+  line: LineId,
   issues: Issue[],
 ): Promise<AttachedLanguage | null> {
   let doc;
@@ -107,7 +108,7 @@ async function readLanguage(
     issues.push(issue('error', reason(error), lang));
     return null;
   }
-  const extract = extractLanguage(doc, config, lang);
+  const extract = extractLanguage(doc, config, lang, line);
   if (extract.products.length === 0) {
     issues.push(issue('error', `nessun prodotto trovato in ${lang}: controlla gli stili in catalogo.config.yaml`, lang));
   }
@@ -130,7 +131,7 @@ async function composeLine(opts: BuildOptions, inputDir: string, imgDir: string,
 
   const perLang: AttachedLanguage[] = [];
   for (const input of await findLanguageInputs(inputDir, config.languages, issues)) {
-    const language = await readLanguage(input, config, issues);
+    const language = await readLanguage(input, config, opts.line, issues);
     if (language) perLang.push(language);
   }
   // Il motivo (cartella o IDML dell'italiano inutilizzabili) è già tra gli errori.
@@ -154,8 +155,21 @@ async function composeLine(opts: BuildOptions, inputDir: string, imgDir: string,
   const products: Product[] = [];
   for (const product of merged.products) {
     const { images, drawings, videoUrl } = await processProduct(product, ctx);
-    const { id, categoryId, name, materials, features, dimensions, optionalCodes, articles } = product;
-    products.push({ id, categoryId, name, materials, features, dimensions, images, drawings, videoUrl, optionalCodes, articles });
+    const { id, categoryId, name, materials, features, dimensions, optionalCodes, fixingOptions, articles } = product;
+    products.push({
+      id,
+      categoryId,
+      name,
+      materials,
+      features,
+      dimensions,
+      images,
+      drawings,
+      videoUrl,
+      optionalCodes,
+      fixingOptions,
+      articles,
+    });
   }
 
   return {

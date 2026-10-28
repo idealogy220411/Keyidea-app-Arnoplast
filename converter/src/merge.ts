@@ -19,6 +19,7 @@ export type MergedProduct = {
   dimensions: LocalizedList;
   articles: MergedArticle[];
   optionalCodes: string[];
+  fixingOptions: LocalizedList;
   imageLinks: string[];
   drawingLinks: string[];
 };
@@ -167,6 +168,7 @@ export function mergeLanguages(perLang: AttachedLanguage[], line: LineId): Merge
         perPallet: article.perPallet,
       })),
       optionalCodes: [...product.optionalCodes],
+      fixingOptions: { [REFERENCE_LANG]: [...product.fixingOptions] },
       imageLinks: [...product.imageLinks],
       drawingLinks: [...product.drawingLinks],
     };
@@ -196,6 +198,7 @@ export function mergeLanguages(perLang: AttachedLanguage[], line: LineId): Merge
       // e l'app usa l'italiano. Qui si segna anche cosa manca, per l'avviso di traduzione incompleta.
       if (match.features.length > 0) merged.features[lang] = [...match.features];
       if (match.dimensions.length > 0) merged.dimensions[lang] = [...match.dimensions];
+      if (match.fixingOptions.length > 0) merged.fixingOptions[lang] = [...match.fixingOptions];
 
       // Se un codice si ripete nel prodotto straniero vale la prima riga.
       const descriptions = new Map<string, string>();

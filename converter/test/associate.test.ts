@@ -13,12 +13,20 @@ const config: ConverterConfig = {
     garden: { name: { it: 'Garden', en: 'Garden' } },
     olive: { name: { it: 'Raccolta olive', en: 'Olive harvesting' } },
   },
+  categories: {
+    agricoltura: [
+      { id: 'copripalo', name: { it: 'COPRIPALO', en: 'POST CAPS' } },
+      { id: 'placchette', name: { it: 'PLACCHETTE', en: 'PLATES' } },
+    ],
+    garden: [],
+    olive: [],
+  },
   styles: {
-    category: 'Titolo categoria',
-    product: 'Titolo prodotto',
-    feature: 'Caratteristiche',
-    dimension: 'Dimensioni',
-    material: 'Bollino materiale',
+    product: 'TITOLO',
+    entry: 'CARATTERTISTICHE',
+    featuresHeading: { it: 'CARATTERISTICHE', en: 'FEATURES' },
+    dimensionsHeading: { it: 'DIMENSIONI', en: 'DIMENSIONS' },
+    optionalFixingHeading: { it: 'OPTIONAL DI FISSAGGIO', en: 'FIXING OPTIONS' },
   },
   articleColumns: ['code', 'description', 'perPack', 'perBox', 'perPallet'],
   optionalPattern: '\\(optional\\)',
@@ -26,7 +34,9 @@ const config: ConverterConfig = {
   qrFilenamePattern: 'qr',
 };
 
-const category = (text: string): StoryItem => ({ kind: 'paragraph', style: config.styles.category, text });
+/** Etichetta di categoria o bollino materiale: senza stile di carattere, riconosciuti dal solo contenuto. */
+const category = (text: string): StoryItem => ({ kind: 'paragraph', style: '', text });
+const material = (text: string): StoryItem => ({ kind: 'paragraph', style: '', text });
 const product = (text: string): StoryItem => ({ kind: 'paragraph', style: config.styles.product, text });
 
 /** URI di un collegamento, come lo scrive InDesign. */
@@ -62,7 +72,7 @@ const FACING: TestPage[] = [
 
 async function attach(spreads: SpreadSpec[]): Promise<AttachedLanguage> {
   const doc = await readIdml(await buildIdml({ spreads }));
-  return attachImages(doc, extractLanguage(doc, config, 'it'), config);
+  return attachImages(doc, extractLanguage(doc, config, 'it', 'agricoltura'), config);
 }
 
 describe('attachImages', () => {
@@ -70,8 +80,8 @@ describe('attachImages', () => {
     const result = await attach([
       {
         frames: [
-          titles(0, 100, category('COPRIPALO'), product('COPRIPALO PRISMA')),
-          titles(0, 500, product('COPRIPALO QUBO')),
+          titles(0, 100, category('COPRIPALO'), product('COPRIPALO PRISMA'), material('PP')),
+          titles(0, 500, product('COPRIPALO QUBO'), material('PP')),
           image('prisma.jpg', 400, 150),
           image('qubo.jpg', 400, 600),
         ],
@@ -86,8 +96,8 @@ describe('attachImages', () => {
     const result = await attach([
       {
         frames: [
-          titles(0, 300, category('COPRIPALO'), product('COPRIPALO PRISMA')),
-          titles(0, 600, product('COPRIPALO QUBO')),
+          titles(0, 300, category('COPRIPALO'), product('COPRIPALO PRISMA'), material('PP')),
+          titles(0, 600, product('COPRIPALO QUBO'), material('PP')),
           image('testata.jpg', 400, 50),
         ],
       },
@@ -172,8 +182,8 @@ describe('attachImages', () => {
     const result = await attach([
       {
         frames: [
-          titles(0, 100, category('COPRIPALO'), product('COPRIPALO PRISMA')),
-          titles(0, 500, product('COPRIPALO QUBO')),
+          titles(0, 100, category('COPRIPALO'), product('COPRIPALO PRISMA'), material('PP')),
+          titles(0, 500, product('COPRIPALO QUBO'), material('PP')),
           image('qubo-1.jpg', 400, 600),
         ],
       },
@@ -306,7 +316,7 @@ describe('attachImages', () => {
         spreads: [{ frames: [titles(0, 0, category('COPRIPALO'), product('COPRIPALO PRISMA')), image('foto.jpg', 400, 0)] }],
       }),
     );
-    const extracted = extractLanguage(doc, config, 'it');
+    const extracted = extractLanguage(doc, config, 'it', 'agricoltura');
     const issue: Issue = { level: 'warning', message: 'avviso di estrazione', where: 'spread 1' };
 
     const result = attachImages(doc, { ...extracted, issues: [issue] }, config);

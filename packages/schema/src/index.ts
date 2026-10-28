@@ -100,6 +100,8 @@ const productSchema = z
     drawings: z.array(imageRefSchema),
     videoUrl: httpUrlSchema.nullable(),
     optionalCodes: z.array(articleCodeSchema),
+    /** Optional di fissaggio, per lingua: nomi letti dal catalogo (non codici articolo: il file reale non permette di collegarli in modo affidabile). */
+    fixingOptions: localizedListSchema,
     articles: z.array(articleSchema),
   })
   .superRefine((product, ctx) => {

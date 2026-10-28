@@ -26,6 +26,7 @@ function validProduct(id = 'agricoltura/copripalo-prisma', categoryId = 'agricol
     drawings: [],
     videoUrl: null,
     optionalCodes: [],
+    fixingOptions: { it: [] },
     articles: [article('1807-1351')],
   };
 }

@@ -28,14 +28,15 @@ type SampleTexts = {
   descriptions: string[];
 };
 
-// Nomi degli stili di `converter/catalogo.config.yaml`.
+// Nomi degli stili di `converter/catalogo.config.yaml`: come nel file reale, un solo stile di carattere
+// per i titoli (che apre anche le intestazioni di caratteristiche/dimensioni) e uno per le righe sotto;
+// la categoria e il materiale non hanno stile (si riconoscono dal contenuto).
 const STYLES = {
-  category: 'Titolo categoria',
-  product: 'Titolo prodotto',
-  feature: 'Caratteristiche',
-  dimension: 'Dimensioni',
-  material: 'Bollino materiale',
+  product: 'TITOLO',
+  entry: 'CARATTERTISTICHE',
 } as const;
+const FEATURES_HEADING = { it: 'CARATTERISTICHE', en: 'FEATURES' } as const;
+const DIMENSIONS_HEADING = { it: 'DIMENSIONI', en: 'DIMENSIONS' } as const;
 
 const TEXTS: Record<'it' | 'en', SampleTexts> = {
   it: {
@@ -72,8 +73,12 @@ const imageFrame = (name: string, x: number, y: number, w: number, h: number): T
   h,
 });
 
-/** IDML di una lingua: una pagina di apertura con la categoria e la sua foto, poi la pagina del prodotto. */
-function idmlFor(texts: SampleTexts, extraLinks: string[]): Promise<string> {
+/**
+ * IDML di una lingua: una pagina di apertura con la categoria (senza stile, come nel file reale) e la sua
+ * foto, poi la pagina del prodotto. Il materiale (senza stile) e le intestazioni di caratteristiche/dimensioni
+ * (stesso stile del titolo, testo per lingua) riproducono la struttura trovata nel pacchetto reale.
+ */
+function idmlFor(lang: 'it' | 'en', texts: SampleTexts, extraLinks: string[]): Promise<string> {
   const table: StoryItem = {
     kind: 'table',
     rows: [
@@ -85,15 +90,17 @@ function idmlFor(texts: SampleTexts, extraLinks: string[]): Promise<string> {
   return buildIdml({
     spreads: [
       {
-        frames: [textFrame(0, 100, [paragraph(STYLES.category, texts.category)]), imageFrame('apertura.png', 300, 200, 400, 300)],
+        frames: [textFrame(0, 100, [paragraph('', texts.category)]), imageFrame('apertura.png', 300, 200, 400, 300)],
       },
       {
         frames: [
           textFrame(0, 100, [
             paragraph(STYLES.product, texts.product),
-            paragraph(STYLES.material, 'PP'),
-            ...texts.features.map((text) => paragraph(STYLES.feature, text)),
-            ...texts.dimensions.map((text) => paragraph(STYLES.dimension, text)),
+            paragraph('', 'PP'),
+            paragraph(STYLES.product, FEATURES_HEADING[lang]),
+            ...texts.features.map((text) => paragraph(STYLES.entry, text)),
+            paragraph(STYLES.product, DIMENSIONS_HEADING[lang]),
+            ...texts.dimensions.map((text) => paragraph(STYLES.entry, text)),
             table,
           ]),
           imageFrame('foto.png', 400, 150, 200, 100),
@@ -131,7 +138,7 @@ export async function makeSampleInput(dir: string, options: SampleInputOptions =
   for (const lang of ['it', 'en'] as const) {
     const linksDir = join(dir, lang, 'Links');
     await mkdir(linksDir, { recursive: true });
-    await copyFile(await idmlFor(TEXTS[lang], extraLinks), join(dir, lang, 'catalogo.idml'));
+    await copyFile(await idmlFor(lang, TEXTS[lang], extraLinks), join(dir, lang, 'catalogo.idml'));
     await copyFile(PDF_FIXTURE, join(linksDir, 'disegno.pdf'));
     for (const [name, content] of Object.entries(files)) await writeFile(join(linksDir, name), content);
   }

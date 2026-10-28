@@ -29,6 +29,7 @@ const product = ({ name, codes, ...rest }: ProductSpec): AttachedProduct => ({
   dimensions: [],
   articles: codes.map((code) => article(code)),
   optionalCodes: [],
+  fixingOptions: [],
   anchor: ANCHOR,
   imageLinks: [],
   drawingLinks: [],

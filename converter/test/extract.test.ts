@@ -12,12 +12,20 @@ const config: ConverterConfig = {
     garden: { name: { it: 'Garden', en: 'Garden' } },
     olive: { name: { it: 'Raccolta olive', en: 'Olive harvesting' } },
   },
+  categories: {
+    agricoltura: [
+      { id: 'copripalo', name: { it: 'COPRIPALO', en: 'POST CAPS' } },
+      { id: 'placchette', name: { it: 'PLACCHETTE', en: 'PLATES' } },
+    ],
+    garden: [],
+    olive: [],
+  },
   styles: {
-    category: 'Titolo categoria',
-    product: 'Titolo prodotto',
-    feature: 'Caratteristiche',
-    dimension: 'Dimensioni',
-    material: 'Bollino materiale',
+    product: 'TITOLO',
+    entry: 'CARATTERTISTICHE',
+    featuresHeading: { it: 'CARATTERISTICHE', en: 'FEATURES' },
+    dimensionsHeading: { it: 'DIMENSIONI', en: 'DIMENSIONS' },
+    optionalFixingHeading: { it: 'OPTIONAL DI FISSAGGIO', en: 'FIXING OPTIONS' },
   },
   articleColumns: ['code', 'description', 'perPack', 'perBox', 'perPallet'],
   optionalPattern: '\\(optional\\)',
@@ -25,11 +33,20 @@ const config: ConverterConfig = {
   qrFilenamePattern: 'qr',
 };
 
-const category = (text: string): StoryItem => ({ kind: 'paragraph', style: config.styles.category, text });
-const product = (text: string): StoryItem => ({ kind: 'paragraph', style: config.styles.product, text });
-const feature = (text: string): StoryItem => ({ kind: 'paragraph', style: config.styles.feature, text });
-const dimension = (text: string): StoryItem => ({ kind: 'paragraph', style: config.styles.dimension, text });
-const material = (text: string): StoryItem => ({ kind: 'paragraph', style: config.styles.material, text });
+/** Frame senza alcuno stile di carattere: come lo sono, nel file reale, le etichette di categoria e i bollini materiale. */
+const unstyled = (text: string): StoryItem => ({ kind: 'paragraph', style: '', text });
+/** Etichetta di categoria (ripresa a margine pagina): riconosciuta dal solo contenuto, senza stile. */
+const category = unstyled;
+/** Bollino materiale (PP, PE, …): riconosciuto dal solo contenuto, senza stile. */
+const material = unstyled;
+/** Frame nello stile di titolo: titolo di prodotto, oppure una delle intestazioni che gli somigliano. */
+const titled = (text: string): StoryItem => ({ kind: 'paragraph', style: config.styles.product, text });
+const product = titled;
+const featuresHeading = (): StoryItem => titled(config.styles.featuresHeading.it);
+const dimensionsHeading = (): StoryItem => titled(config.styles.dimensionsHeading.it);
+const optionalHeading = (): StoryItem => titled(config.styles.optionalFixingHeading.it);
+/** Riga di caratteristica o di dimensione (lo stesso stile per entrambe: il significato lo decide l'intestazione). */
+const entry = (text: string): StoryItem => ({ kind: 'paragraph', style: config.styles.entry, text });
 const table = (...rows: string[][]): StoryItem => ({ kind: 'table', rows });
 
 const HEADER = ['COD.', 'DESCRIZIONE', 'CONF.', 'IMB.', 'PALLET'];
@@ -45,7 +62,7 @@ async function extract(
   lang = 'it',
 ): Promise<LanguageExtract> {
   const doc = await readIdml(await buildIdml({ spreads: spreads.map((frames) => ({ frames })) }));
-  return extractLanguage(doc, { ...config, ...changes }, lang);
+  return extractLanguage(doc, { ...config, ...changes }, lang, 'agricoltura');
 }
 
 /** Un solo prodotto con la categoria, il titolo e gli elementi indicati. */
@@ -62,8 +79,9 @@ describe('extractLanguage', () => {
           0,
           category('COPRIPALO'),
           product('COPRIPALO PRISMA'),
-          { kind: 'paragraph', style: 'Testo corrente', text: 'testo che non interessa' },
+          { kind: 'paragraph', style: 'tab_nome', text: 'testo che non interessa' },
           product('COPRIPALO QUBO'),
+          material('PP'),
         ),
       ],
     ]);
@@ -86,16 +104,50 @@ describe('extractLanguage', () => {
     expect(result.products.map((p) => p.categoryOrder)).toEqual([0, 1]);
   });
 
-  it('extracts features and dimensions without bullets', async () => {
+  it('ignores a repeated category label on later pages of the same section', async () => {
+    const result = await extract([
+      [frame(0, 0, category('COPRIPALO'), product('COPRIPALO PRISMA'))],
+      [frame(0, 0, category('COPRIPALO'), product('COPRIPALO QUBO'))],
+    ]);
+    expect(result.categories).toHaveLength(1);
+    expect(result.products.map((p) => p.categoryOrder)).toEqual([0, 0]);
+  });
+
+  it('reactivates a category already declared earlier in the document instead of duplicating it', async () => {
+    // Caso reale: la pagina indice, all'inizio del documento, elenca già tutte le categorie dichiarate
+    // (etichette senza stile, come quelle a margine pagina) prima di qualunque prodotto. Senza riattivare
+    // la categoria già vista, ogni sezione reale produrrebbe una categoria duplicata e i prodotti
+    // finirebbero attaccati all'ultima categoria dell'indice invece che a quella giusta.
+    const result = await extract([
+      // pagina indice: entrambe le categorie dichiarate, senza nessun prodotto
+      [frame(0, 0, category('COPRIPALO'), category('PLACCHETTE'))],
+      // sezione reale di COPRIPALO
+      [frame(0, 100, category('COPRIPALO'), product('COPRIPALO PRISMA'))],
+      // sezione reale di PLACCHETTE
+      [frame(0, 200, category('PLACCHETTE'), product('PLACCHETTA ROMA'))],
+    ]);
+    expect(result.categories.map((c) => c.name)).toEqual(['COPRIPALO', 'PLACCHETTE']);
+    // l'ancora segue l'ultima comparsa (la sezione reale), non la pagina indice
+    expect(result.categories[0].anchor).toEqual({ spreadIndex: 1, x: 0, y: 100 });
+    expect(result.categories[1].anchor).toEqual({ spreadIndex: 2, x: 0, y: 200 });
+    expect(result.products.map((p) => [p.name, p.categoryOrder])).toEqual([
+      ['COPRIPALO PRISMA', 0],
+      ['PLACCHETTA ROMA', 1],
+    ]);
+  });
+
+  it('extracts features and dimensions without bullets, recognizing the headings by text', async () => {
     const result = await extract(
       oneProduct(
-        feature('• viteria certificata 8.8'),
-        feature('  ▪   coperchio  in PP  '),
-        feature('- resistente a -30°C'),
-        feature('resistente ai raggi UV'),
-        feature('-30°C / +60°C'),
-        dimension('• 7x7 cm'),
-        dimension('- altezza   120 cm'),
+        featuresHeading(),
+        entry('• viteria certificata 8.8'),
+        entry('  ▪   coperchio  in PP  '),
+        entry('- resistente a -30°C'),
+        entry('resistente ai raggi UV'),
+        entry('-30°C / +60°C'),
+        dimensionsHeading(),
+        entry('• 7x7 cm'),
+        entry('- altezza   120 cm'),
       ),
     );
     expect(result.products[0].features).toEqual([
@@ -107,6 +159,30 @@ describe('extractLanguage', () => {
     ]);
     expect(result.products[0].dimensions).toEqual(['7x7 cm', 'altezza 120 cm']);
     expect(result.issues).toEqual([]);
+  });
+
+  it('recognizes the headings without regard to case', async () => {
+    const result = await extract(oneProduct(titled('caratteristiche'), entry('viteria certificata')));
+    expect(result.products[0].features).toEqual(['viteria certificata']);
+  });
+
+  it('warns on an entry row outside any heading', async () => {
+    const result = await extract(oneProduct(entry('viteria certificata')));
+    expect(result.products[0].features).toEqual([]);
+    expect(result.products[0].dimensions).toEqual([]);
+    expect(result.issues).toHaveLength(1);
+    expect(result.issues[0]).toMatchObject({ level: 'warning', where: 'spread 1' });
+    expect(result.issues[0].message).toContain('viteria certificata');
+  });
+
+  it('treats a pure-title frame that is neither a heading nor an optional label as a new product', async () => {
+    // Come nel file reale, il nuovo prodotto ha un contenuto proprio (qui un bollino materiale): un titolo
+    // «puro» senza nessun contenuto proprio è invece un optional di fissaggio del prodotto corrente (vedi
+    // «resolves a pending title at the table as a fixing option», sotto).
+    const result = await extract(oneProduct(featuresHeading(), entry('viteria'), product('COPRIPALO QUBO'), material('PP')));
+    expect(result.products.map((p) => p.name)).toEqual(['COPRIPALO PRISMA', 'COPRIPALO QUBO']);
+    expect(result.products[0].features).toEqual(['viteria']);
+    expect(result.products[1].materials).toEqual(['PP']);
   });
 
   it('parses article table by position', async () => {
@@ -204,7 +280,7 @@ describe('extractLanguage', () => {
         table(
           ['COD.', 'DESCRIZIONE', 'CONF.', 'IMB.', 'PALLET'],
           ['CODE', 'DESCRIPTION', 'PACK', 'BOX', 'PALLET'],
-          ['CÓDIGO', 'DESCRIPCIÓN', 'ENV.', 'CAJA', 'PALÉ'],
+          ['CÓDIGO', 'DESCRIPCIÓN', 'ENV.', 'CAJA', 'PALÉ'],
           ['codice', 'Descrizione', '', '', ''],
           ['', '', '', '', ''],
           ['1807-1351', 'Coprip Prisma 7x7', '40', '40', '640'],
@@ -251,36 +327,104 @@ describe('extractLanguage', () => {
     expect(result.products[0].optionalCodes).toEqual(['2008-0016']);
   });
 
-  it('reads material badges', async () => {
+  it('reads material badges by content, with no character style', async () => {
     const result = await extract(oneProduct(material('PP'), material(' PET '), material('PP')));
     expect(result.products[0].materials).toEqual(['PP', 'PET']);
     expect(result.issues).toEqual([]);
   });
 
-  it('warns on unknown material', async () => {
-    const result = await extract(oneProduct(material('ABS')));
+  it('ignores unstyled text that matches neither a declared category nor a material code', async () => {
+    const result = await extract(oneProduct(unstyled('(optional)'), unstyled('ABS'), unstyled('Esempio schematico')));
     expect(result.products[0].materials).toEqual([]);
-    expect(result.issues).toHaveLength(1);
-    expect(result.issues[0]).toMatchObject({ level: 'warning', where: 'spread 1' });
-    expect(result.issues[0].message).toContain('ABS');
+    expect(result.issues).toEqual([]);
   });
 
   it('replaces the materials read with the overrides', async () => {
+    // PRISMA e QUBO su due pagine (spread) distinte: nel file reale un prodotto sta sempre su una sola
+    // pagina, ed è il cambio di pagina a chiudere il prodotto precedente prima di aprire il successivo.
     const spreads = [
+      [frame(0, 0, category('COPRIPALO'), product('COPRIPALO PRISMA'), material('PE'))],
+      [frame(0, 0, product('COPRIPALO QUBO'), material('PET'))],
+    ];
+    const result = await extract(spreads, { overrides: { materials: { 'COPRIPALO PRISMA': ['PP', 'FE'] } } });
+    expect(result.products.map((p) => p.materials)).toEqual([['PP', 'FE'], ['PET']]);
+  });
+
+  it('collects the fixing-option labels that follow the heading as text, not as separate products', async () => {
+    const result = await extract(
+      oneProduct(
+        optionalHeading(),
+        titled('VITERIA STANDARD 4 PZ'),
+        titled('VITERIA GZ'),
+        table(HEADER, ['1807-1357', 'Viteria per Cp (4pz.)', '40', '200', '-']),
+      ),
+    );
+    expect(result.products).toHaveLength(1);
+    expect(result.products[0].fixingOptions).toEqual(['VITERIA STANDARD 4 PZ', 'VITERIA GZ']);
+    expect(result.products[0].articles).toHaveLength(1);
+    expect(result.issues).toEqual([]);
+  });
+
+  it('resolves the fixing-option labels at the change of page, even when the table comes before the heading', async () => {
+    // Struttura esatta della pagina di Copripalo Prisma nel file reale: le etichette «VITERIA...» e la
+    // tabella degli articoli stanno SOPRA l'intestazione «OPTIONAL DI FISSAGGIO» (la posizione sulla pagina
+    // non segue l'ordine logico). Il prodotto successivo è su una pagina diversa.
+    const result = await extract([
       [
         frame(
           0,
           0,
           category('COPRIPALO'),
           product('COPRIPALO PRISMA'),
-          material('PE'),
-          product('COPRIPALO QUBO'),
-          material('PET'),
+          titled('VITERIA STANDARD 4 PZ'),
+          table(HEADER, ['1807-1357', 'Viteria per Cp (4pz.)', '40', '200', '-']),
+          optionalHeading(),
         ),
       ],
-    ];
-    const result = await extract(spreads, { overrides: { materials: { 'COPRIPALO PRISMA': ['PP', 'FE'] } } });
-    expect(result.products.map((p) => p.materials)).toEqual([['PP', 'FE'], ['PET']]);
+      [frame(0, 0, product('COPRIPALO QUBO'))],
+    ]);
+    expect(result.products.map((p) => p.name)).toEqual(['COPRIPALO PRISMA', 'COPRIPALO QUBO']);
+    expect(result.products[0].fixingOptions).toEqual(['VITERIA STANDARD 4 PZ']);
+    expect(result.products[0].articles).toHaveLength(1);
+  });
+
+  it('resolves a pending title at the table as a fixing option, even without ever seeing the heading', async () => {
+    // Caso reale: nella pagina di Copripalo Reno le etichette «VITERIA...» non hanno nessuna intestazione
+    // «OPTIONAL DI FISSAGGIO» sopra di sé (compare per altri prodotti, non per questo): alla tabella, che è
+    // sempre quella del prodotto aperto, sono comunque il suo optional di fissaggio, non prodotti a sé stanti.
+    const result = await extract(
+      oneProduct(titled('VITERIA RETE PIANA'), titled('VITERIA GZ'), table(HEADER, ['1807-1357', 'Viteria', '40', '200', '-'])),
+    );
+    expect(result.products).toHaveLength(1);
+    expect(result.products[0].fixingOptions).toEqual(['VITERIA RETE PIANA', 'VITERIA GZ']);
+    expect(result.products[0].articles).toHaveLength(1);
+  });
+
+  it('resolves a pending title at the next material badge or entry row as a new product, even after the heading', async () => {
+    // Un bollino materiale o una riga di caratteristica/dimensione è sempre contenuto proprio di un prodotto
+    // vero (un optional di fissaggio è solo un nome, senza caratteristiche né materiale propri): la loro
+    // comparsa scioglie un titolo in sospeso come nuovo prodotto, anche se l'intestazione optional era già
+    // comparsa per il prodotto precedente.
+    const result = await extract(
+      oneProduct(
+        optionalHeading(),
+        titled('VITERIA GZ'),
+        table(HEADER, ['1807-1357', 'Viteria per Cp (4pz.)', '40', '200', '-']),
+        titled('COPRIPALO QUBO'),
+        material('PP'),
+      ),
+    );
+    expect(result.products.map((p) => p.name)).toEqual(['COPRIPALO PRISMA', 'COPRIPALO QUBO']);
+    expect(result.products[0].fixingOptions).toEqual(['VITERIA GZ']);
+    expect(result.products[1].materials).toEqual(['PP']);
+  });
+
+  it('reports a fixing-option label before any product as an error, like any other misplaced content', async () => {
+    const result = await extract([[frame(0, 0, category('COPRIPALO'), optionalHeading(), titled('VITERIA GZ'))]]);
+    expect(result.products).toEqual([]);
+    expect(result.issues).toHaveLength(1);
+    expect(result.issues[0]).toMatchObject({ level: 'warning' });
+    expect(result.issues[0].message).toContain('VITERIA GZ');
   });
 
   it('warns on content outside a product', async () => {
@@ -290,26 +434,36 @@ describe('extractLanguage', () => {
         frame(
           0,
           0,
-          feature('• viteria certificata 8.8'),
-          dimension('7x7 cm'),
+          featuresHeading(),
+          entry('viteria certificata 8.8'),
+          dimensionsHeading(),
+          entry('7x7 cm'),
           table(HEADER, ['1807-1351', 'Coprip Prisma 7x7', '40', '40', '640']),
-          material('PP'),
         ),
         frame(0, 300, product('COPRIPALO PRISMA')),
       ],
     ]);
     expect(result.products).toHaveLength(1);
-    expect(result.products[0]).toMatchObject({ features: [], dimensions: [], articles: [], materials: [] });
-    expect(result.issues).toHaveLength(4);
-    expect(result.issues.map((i) => i.level)).toEqual(['warning', 'warning', 'warning', 'warning']);
-    expect(result.issues.map((i) => i.where)).toEqual(['spread 2', 'spread 2', 'spread 2', 'spread 2']);
+    expect(result.products[0]).toMatchObject({ features: [], dimensions: [], articles: [] });
+    expect(result.issues).toHaveLength(3);
+    expect(result.issues.map((i) => i.level)).toEqual(['warning', 'warning', 'warning']);
+    expect(result.issues.map((i) => i.where)).toEqual(['spread 2', 'spread 2', 'spread 2']);
+  });
+
+  it('attaches a material badge found before any product to the next one opened on the same page', async () => {
+    // Caso reale: nella pagina di Copripalo Prisma il bollino materiale sta una frazione di punto più in alto
+    // del titolo che lo segue, quindi nell'ordine di lettura risulta prima che un prodotto sia aperto: è
+    // comunque il materiale di quel prodotto, non un errore da segnalare.
+    const result = await extract([[frame(0, 0, category('COPRIPALO'), material('PP'), product('COPRIPALO PRISMA'))]]);
+    expect(result.products[0].materials).toEqual(['PP']);
+    expect(result.issues).toEqual([]);
   });
 
   it('does not attach content after a new category to the previous product', async () => {
     const result = await extract([
       [
         frame(0, 0, category('COPRIPALO'), product('COPRIPALO PRISMA')),
-        frame(0, 200, category('PLACCHETTE'), feature('testo prima del prodotto')),
+        frame(0, 200, category('PLACCHETTE'), featuresHeading(), entry('testo prima del prodotto')),
       ],
     ]);
     expect(result.products[0].features).toEqual([]);
@@ -318,7 +472,7 @@ describe('extractLanguage', () => {
   });
 
   it('reports a product before any category as an error', async () => {
-    const result = await extract([[frame(0, 0, product('COPRIPALO PRISMA'), feature('viteria'))]]);
+    const result = await extract([[frame(0, 0, product('COPRIPALO PRISMA'), featuresHeading(), entry('viteria'))]]);
     expect(result.categories).toEqual([]);
     expect(result.products).toEqual([]);
     expect(result.issues[0]).toMatchObject({ level: 'error', where: 'spread 1' });
@@ -328,11 +482,11 @@ describe('extractLanguage', () => {
   it('orders products by spread then position', async () => {
     const result = await extract([
       [
-        frame(0, 400, product('PRODOTTO BASSO A SINISTRA')),
-        frame(600, 100, product('PRODOTTO ALTO A DESTRA')),
+        frame(0, 400, product('PRODOTTO BASSO A SINISTRA'), material('PP')),
+        frame(600, 100, product('PRODOTTO ALTO A DESTRA'), material('PP')),
         frame(0, 0, category('COPRIPALO')),
       ],
-      [frame(0, 0, product('PRODOTTO DEL SECONDO SPREAD'))],
+      [frame(0, 0, product('PRODOTTO DEL SECONDO SPREAD'), material('PP'))],
     ]);
     expect(result.products.map((p) => p.name)).toEqual([
       'PRODOTTO ALTO A DESTRA',
@@ -359,7 +513,7 @@ describe('extractLanguage', () => {
         ],
       }),
     );
-    const result = extractLanguage(doc, config, 'it');
+    const result = extractLanguage(doc, config, 'it', 'agricoltura');
 
     expect(result.issues).toEqual([]);
     expect(result.categories.map((c) => c.name)).toEqual(['COPRIPALO']);
@@ -382,7 +536,7 @@ describe('extractLanguage', () => {
             frames: [
               frame(0, 0, category('COPRIPALO')),
               frame(50, 50, product('COPRIPALO PRISMA')),
-              frame(50, 700, feature('viteria certificata')),
+              frame(50, 700, featuresHeading(), entry('viteria certificata')),
               frame(650, 100, product('COPRIPALO QUBO')),
               frame(650, 300, table(HEADER, ['1807-2000', 'Qubo', '1', '1', '1'])),
             ],
@@ -390,7 +544,7 @@ describe('extractLanguage', () => {
         ],
       }),
     );
-    const result = extractLanguage(doc, config, 'it');
+    const result = extractLanguage(doc, config, 'it', 'agricoltura');
 
     const [prisma, qubo] = result.products;
     expect(prisma.name).toBe('COPRIPALO PRISMA');
@@ -404,8 +558,8 @@ describe('extractLanguage', () => {
   it('reads frames with the same height from left to right', async () => {
     const result = await extract([
       [
-        frame(600, 100, product('PRODOTTO A DESTRA')),
-        frame(0, 100, product('PRODOTTO A SINISTRA')),
+        frame(600, 100, product('PRODOTTO A DESTRA'), material('PP')),
+        frame(0, 100, product('PRODOTTO A SINISTRA'), material('PP')),
         frame(0, 0, category('COPRIPALO')),
       ],
     ]);
@@ -415,7 +569,10 @@ describe('extractLanguage', () => {
   it('anchors titles on the frame that holds them', async () => {
     const result = await extract([
       [frame(0, 0, category('COPRIPALO'))],
-      [frame(40, 70, product('COPRIPALO PRISMA')), frame(640, 90, product('COPRIPALO QUBO'))],
+      [
+        frame(40, 70, product('COPRIPALO PRISMA'), material('PP')),
+        frame(640, 90, product('COPRIPALO QUBO'), material('PP')),
+      ],
     ]);
     expect(result.categories[0].anchor).toEqual({ spreadIndex: 0, x: 0, y: 0 });
     expect(result.products.map((p) => p.anchor)).toEqual([
@@ -426,7 +583,7 @@ describe('extractLanguage', () => {
 
   it('reads a threaded story once, anchored on its first frame', async () => {
     const style = (name: string, text: string): string =>
-      `<ParagraphStyleRange AppliedParagraphStyle="ParagraphStyle/${name}"><CharacterStyleRange><Content>${text}</Content><Br/></CharacterStyleRange></ParagraphStyleRange>`;
+      `<ParagraphStyleRange AppliedParagraphStyle="ParagraphStyle/$ID/NormalParagraphStyle"><CharacterStyleRange${name ? ` AppliedCharacterStyle="CharacterStyle/${name}"` : ''}><Content>${text}</Content><Br/></CharacterStyleRange></ParagraphStyleRange>`;
     const path = (x0: number, y0: number, x1: number, y1: number): string => {
       const anchors = [
         [x0, y0],
@@ -440,7 +597,11 @@ describe('extractLanguage', () => {
     };
     const file = await buildRawIdml({
       stories: {
-        s1: style('Titolo categoria', 'COPRIPALO') + style('Titolo prodotto', 'COPRIPALO PRISMA') + style('Caratteristiche', 'viteria'),
+        s1:
+          style('', 'COPRIPALO') +
+          style('TITOLO', 'COPRIPALO PRISMA') +
+          style('TITOLO', 'CARATTERISTICHE') +
+          style('CARATTERTISTICHE', 'viteria'),
       },
       spreads: [
         // f2 è il secondo anello del filo, ma ha la `y` minore: nell'ordine di lettura viene per primo
@@ -448,7 +609,7 @@ describe('extractLanguage', () => {
           `<TextFrame Self="f1" ParentStory="s1" NextTextFrame="f2" ItemTransform="1 0 0 1 30 20">${path(0, 0, 100, 50)}</TextFrame>`,
       ],
     });
-    const result = extractLanguage(await readIdml(file), config, 'it');
+    const result = extractLanguage(await readIdml(file), config, 'it', 'agricoltura');
     expect(result.products).toHaveLength(1);
     expect(result.products[0].features).toEqual(['viteria']);
     expect(result.products[0].anchor).toEqual({ spreadIndex: 0, x: 200, y: 10 });

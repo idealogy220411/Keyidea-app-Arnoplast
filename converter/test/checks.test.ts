@@ -23,6 +23,7 @@ const product = (id: string, name: string, categoryId: string, articles: Article
   drawings: [],
   videoUrl: null,
   optionalCodes: [],
+  fixingOptions: { it: [] },
   articles,
 });
 

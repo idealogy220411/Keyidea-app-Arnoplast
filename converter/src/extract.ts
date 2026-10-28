@@ -1,4 +1,4 @@
-import { ARTICLE_CODE_RE, MATERIALS, type Material } from '@arnoplast/schema';
+import { ARTICLE_CODE_RE, MATERIALS, type LineId, type Material } from '@arnoplast/schema';
 import type { ConverterConfig } from './config';
 import { pageIndexAt } from './pages';
 import type { IdmlDocument, IdmlSpread, Issue, TextFrame } from './types';
@@ -22,6 +22,8 @@ export type RawProduct = {
   dimensions: string[];
   articles: RawArticle[];
   optionalCodes: string[];
+  /** Optional di fissaggio: nomi letti dall'elenco che segue l'intestazione «OPTIONAL DI FISSAGGIO» (testo, non codici). */
+  fixingOptions: string[];
   anchor: Anchor;
 };
 
@@ -136,19 +138,119 @@ function readArticleTable(
   }
 }
 
+/** Confronto testuale senza badare a maiuscole/minuscole (il testo è già passato da `tidy`). */
+const foldedEquals = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase();
+
+/** «Modalità» in corso nel prodotto corrente, aperta da un'intestazione: decide dove vanno le righe `styles.entry`. */
+type Mode = 'features' | 'dimensions' | undefined;
+
+/** Titolo «puro» (stile `styles.product`, non un'intestazione) incontrato mentre un prodotto è già aperto: non si
+ * sa ancora se è un nuovo prodotto o il nome di un optional di fissaggio del prodotto corrente. `owner` è il
+ * prodotto aperto in quel momento: la decisione, per quanto rinviata, si applica sempre a quello, non a
+ * qualunque prodotto sia `current` quando arriva (che nel frattempo può essere cambiato). */
+type PendingTitle = { text: string; anchor: Anchor; where: string; owner: RawProduct };
+
 /**
  * Estrae categorie, prodotti e articoli di una lingua dal documento IDML.
  * Ordine di lettura: spread in ordine; nello spread i frame di testo dall'alto in basso e da sinistra a destra;
  * ogni storia si legge una sola volta, dal suo primo frame.
+ *
+ * Nel file reale non esistono stili di paragrafo personalizzati, né uno stile dedicato per categorie e materiali:
+ * il titolo di prodotto (e le intestazioni che gli somigliano) si riconoscono dallo stile di carattere
+ * `styles.product`; le righe di caratteristiche/dimensioni dallo stile `styles.entry`, con il significato deciso
+ * dall'ultima intestazione incontrata; categorie e materiali dal solo contenuto di un frame senza stile.
  */
-export function extractLanguage(doc: IdmlDocument, config: ConverterConfig, lang: string): LanguageExtract {
+export function extractLanguage(doc: IdmlDocument, config: ConverterConfig, lang: string, line: LineId): LanguageExtract {
   const categories: RawCategory[] = [];
   const products: RawProduct[] = [];
   const issues: Issue[] = [];
   const optionalPattern = new RegExp(config.optionalPattern, 'i');
   const readStories = new Set<string>();
   const { styles } = config;
+  const categoryDefs = config.categories[line] ?? [];
+  const matchCategory = (text: string) => categoryDefs.find((c) => c.name[lang] !== undefined && foldedEquals(c.name[lang], text));
+  const featuresHeadingText = styles.featuresHeading[lang];
+  const dimensionsHeadingText = styles.dimensionsHeading[lang];
+  const optionalFixingHeadingText = styles.optionalFixingHeading[lang];
+
   let current: RawProduct | undefined;
+  /** Categoria attiva: non necessariamente l'ultima pushata in `categories` (si può tornare a una già vista). */
+  let activeCategory: RawCategory | undefined;
+  let mode: Mode;
+  /**
+   * Titoli «puri» in attesa di una decisione (vedi `PendingTitle`) e se, da quando sono in sospeso, è comparsa
+   * l'intestazione «OPTIONAL DI FISSAGGIO» (usato solo per un avviso, vedi sotto: non decide più da solo).
+   * Due fatti, verificati sul file reale, decidono, in quest'ordine di priorità:
+   * - una vera riga di caratteristica/dimensione o un bollino materiale: è sempre contenuto proprio di un
+   *   prodotto (un optional di fissaggio è solo un nome, senza caratteristiche né materiale propri), quindi un
+   *   titolo ancora in sospeso a questo punto è un nuovo prodotto vero e proprio;
+   * - una **tabella**, un cambio di categoria, un cambio di pagina (un prodotto reale sta sempre su una sola
+   *   pagina) o la fine del documento: a questo punto un titolo ancora in sospeso non ha mai avuto un
+   *   contenuto proprio (altrimenti sarebbe già stato risolto dal punto sopra), quindi è un optional di
+   *   fissaggio del prodotto aperto (vedi `owner`). Questo vale anche quando l'intestazione non è ancora
+   *   comparsa, o non compare affatto: nel file reale non è garantito né l'ordine (nella pagina di Copripalo
+   *   Prisma viene dopo le sue etichette) né la presenza (nella pagina di Copripalo Reno manca del tutto).
+   */
+  let pendingTitles: PendingTitle[] = [];
+  let sawOptionalHeading = false;
+  /**
+   * Bollini materiale incontrati senza un prodotto corrente, in attesa del prossimo titolo. Caso reale: il
+   * bollino sta, nella pagina, una frazione di punto più in alto del titolo che lo segue (0.4pt circa nel
+   * file analizzato), quindi nell'ordine di lettura risulta prima del titolo anche se è chiaramente il
+   * materiale di quel prodotto, non di quello (chiuso) della pagina precedente.
+   */
+  let pendingMaterials: Material[] = [];
+
+  /** Apre un nuovo prodotto, applicandogli i bollini materiale eventualmente in attesa. */
+  function openProduct(text: string, anchor: Anchor): RawProduct {
+    const product: RawProduct = {
+      name: text,
+      categoryOrder: activeCategory!.order,
+      materials: [...new Set(pendingMaterials)],
+      features: [],
+      dimensions: [],
+      articles: [],
+      optionalCodes: [],
+      fixingOptions: [],
+      anchor,
+    };
+    pendingMaterials = [];
+    products.push(product);
+    return product;
+  }
+
+  /** I titoli in sospeso diventano gli optional di fissaggio del loro prodotto (`owner`). */
+  function pendingTitlesAreFixingOptions(): void {
+    for (const { text, owner } of pendingTitles) owner.fixingOptions.push(text);
+    pendingTitles = [];
+    sawOptionalHeading = false;
+  }
+
+  /** I titoli in sospeso sono prodotti veri e propri, aperti in sequenza (l'ultimo resta quello corrente). */
+  function pendingTitlesAreProducts(): void {
+    mode = undefined;
+    for (const { text, anchor, where, owner } of pendingTitles) {
+      // Lo stesso titolo ripetuto subito dopo (visto nel file reale, probabilmente una svista del grafico):
+      // non è un secondo prodotto.
+      if (text === owner.name) continue;
+      if (activeCategory) {
+        current = openProduct(text, anchor);
+      } else {
+        issues.push({ level: 'error', message: `Il prodotto ${quote(text)} compare prima della prima categoria: ignorato`, where });
+      }
+    }
+    pendingTitles = [];
+    sawOptionalHeading = false;
+  }
+
+  /** Risoluzione di riserva (cambio di categoria, cambio di pagina, fine documento): mai avuto contenuto proprio. */
+  function resolvePendingTitles(): void {
+    if (pendingTitles.length > 0) pendingTitlesAreFixingOptions();
+    sawOptionalHeading = false;
+  }
+
+  /** Spread e pagina (dentro lo spread) del frame letto in precedenza: un cambio segna la fine di un prodotto. */
+  let lastPageKey: string | undefined;
 
   for (const spread of doc.spreads) {
     const where = `spread ${spread.index + 1}`;
@@ -162,52 +264,102 @@ export function extractLanguage(doc: IdmlDocument, config: ConverterConfig, lang
       readStories.add(frame.storyId);
       const anchor: Anchor = { spreadIndex: spread.index, x: frame.bounds.x, y: frame.bounds.y };
 
+      const pageKey = `${spread.index}:${pageIndexAt(spread.pages, frame.bounds.x, frame.bounds.y)}`;
+      if (lastPageKey !== undefined && pageKey !== lastPageKey) {
+        resolvePendingTitles();
+        current = undefined;
+        mode = undefined;
+        pendingMaterials = [];
+      }
+      lastPageKey = pageKey;
+
       for (const item of doc.stories.get(frame.storyId)?.items ?? []) {
         if (item.kind === 'table') {
+          if (pendingTitles.length > 0) pendingTitlesAreFixingOptions();
+          mode = undefined;
           if (current) readArticleTable(item.rows, current, config, optionalPattern, warn);
           else misplaced('Una tabella');
           continue;
         }
 
         const text = tidy(item.text);
-        if (item.style === styles.category) {
-          categories.push({ name: text, order: categories.length, anchor });
-          current = undefined;
-        } else if (item.style === styles.product) {
-          const category = categories.at(-1);
-          if (category) {
-            current = {
-              name: text,
-              categoryOrder: category.order,
-              materials: [],
-              features: [],
-              dimensions: [],
-              articles: [],
-              optionalCodes: [],
-              anchor,
-            };
-            products.push(current);
+
+        if (item.style === styles.product) {
+          if (featuresHeadingText !== undefined && foldedEquals(text, featuresHeadingText)) {
+            mode = 'features';
+          } else if (dimensionsHeadingText !== undefined && foldedEquals(text, dimensionsHeadingText)) {
+            mode = 'dimensions';
+          } else if (optionalFixingHeadingText !== undefined && foldedEquals(text, optionalFixingHeadingText)) {
+            sawOptionalHeading = true;
+          } else if (current) {
+            // Titolo «puro» mentre un prodotto è già aperto: ambiguo, si decide più avanti (vedi `PendingTitle`).
+            pendingTitles.push({ text, anchor, where, owner: current });
+          } else if (sawOptionalHeading) {
+            // L'intestazione optional è comparsa ma non c'è nessun prodotto a cui attaccare l'etichetta.
+            misplaced(`L'optional di fissaggio ${quote(text)}`);
+            sawOptionalHeading = false;
           } else {
-            current = undefined;
-            issues.push({
-              level: 'error',
-              message: `Il prodotto ${quote(text)} compare prima della prima categoria: ignorato`,
-              where,
-            });
+            // Primo titolo dopo una categoria (o dopo la tabella di un prodotto già risolto): non è ambiguo.
+            mode = undefined;
+            if (activeCategory) {
+              current = openProduct(text, anchor);
+            } else {
+              issues.push({
+                level: 'error',
+                message: `Il prodotto ${quote(text)} compare prima della prima categoria: ignorato`,
+                where,
+              });
+            }
           }
-        } else if (item.style === styles.feature || item.style === styles.dimension) {
+        } else if (item.style === styles.entry) {
           const entry = withoutBullet(text);
           if (entry === '') continue;
-          if (!current) misplaced(`Il testo ${quote(entry)} (stile ${quote(item.style)})`);
-          else (item.style === styles.feature ? current.features : current.dimensions).push(entry);
-        } else if (item.style === styles.material) {
-          if (!current) misplaced(`Il bollino ${quote(text)}`);
-          else if (!isMaterial(text)) warn(`Materiale sconosciuto ${quote(text)} nel prodotto ${quote(current.name)}`);
-          else if (!current.materials.includes(text)) current.materials.push(text);
+          // Una vera riga di caratteristica/dimensione è contenuto proprio di un prodotto: se ce n'era uno in
+          // sospeso (vedi `PendingTitle`) è un nuovo prodotto vero e proprio, non un optional di fissaggio.
+          if (pendingTitles.length > 0) pendingTitlesAreProducts();
+          if (!current) {
+            misplaced(`Il testo ${quote(entry)} (stile ${quote(item.style)})`);
+          } else if (mode === 'features') {
+            current.features.push(entry);
+          } else if (mode === 'dimensions') {
+            current.dimensions.push(entry);
+          } else {
+            warn(
+              `Testo ${quote(entry)} in stile ${quote(item.style)} fuori dalle intestazioni ${quote(featuresHeadingText)}/${quote(dimensionsHeadingText)}: ignorato`,
+            );
+          }
+        } else if (item.style === '') {
+          const declared = matchCategory(text);
+          if (declared) {
+            const label = declared.name[lang] ?? text;
+            if (activeCategory?.name !== label) {
+              resolvePendingTitles();
+              mode = undefined;
+              current = undefined;
+              pendingMaterials = [];
+              // La categoria può ripresentarsi più avanti nel documento (per esempio è già comparsa nella
+              // pagina indice, che precede tutti i prodotti): si riattiva quella già dichiarata invece di
+              // crearne una seconda, spostando l'ancora sull'ultima comparsa.
+              const existing = categories.find((c) => c.name === label);
+              if (existing) {
+                existing.anchor = anchor;
+                activeCategory = existing;
+              } else {
+                activeCategory = { name: label, order: categories.length, anchor };
+                categories.push(activeCategory);
+              }
+            }
+          } else if (isMaterial(text)) {
+            // Un bollino materiale è contenuto proprio di un prodotto: stessa logica delle righe sopra.
+            if (pendingTitles.length > 0) pendingTitlesAreProducts();
+            if (!current) pendingMaterials.push(text);
+            else if (!current.materials.includes(text)) current.materials.push(text);
+          }
         }
       }
     }
   }
+  resolvePendingTitles();
 
   // Correzioni a mano: la chiave è il nome del prodotto in italiano.
   const forced = config.overrides?.materials ?? {};

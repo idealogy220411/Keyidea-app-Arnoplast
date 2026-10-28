@@ -45,6 +45,7 @@ function product(overrides: Partial<MergedProduct> = {}): MergedProduct {
     dimensions: { it: [] },
     articles: [],
     optionalCodes: [],
+    fixingOptions: { it: [] },
     imageLinks: [],
     drawingLinks: [],
     ...overrides,
