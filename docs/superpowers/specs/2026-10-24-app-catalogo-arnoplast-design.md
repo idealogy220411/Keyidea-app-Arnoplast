@@ -272,7 +272,14 @@ Riferimento: `docs/mockups/bozze-v2.html`.
 - **Icone:** disegnate su misura nello stesso stile (tratto arrotondato): quelle delle tre linee in `docs/mockups/icone-linee-v1.html`, quelle delle azioni (filtri, video, email, WhatsApp, lingua, stato catalogo, chi siamo, contatti, privacy) in `docs/mockups/icone-funzionali-v1.html`.
 - **Stile visivo:** direzione «A · Essenziale» (sfondo chiaro, fasce e pulsanti nel rosso del marchio, schede con foto grandi), scelta tra tre proposte grafiche di riferimento.
 - **Barra in basso, confermata:** le 5 voci già decise (Agricoltura, Garden, Olive, Cerca, Preferiti), con le icone scelte, nello stile «A · Essenziale» — vedi `docs/mockups/bozze-v3-navigazione.html`.
-- **Bozze v3:** prima di sviluppare l'interfaccia prepariamo le bozze v3 complete (tutte le schermate, nello stile e con la navigazione appena confermati), da approvare.
+- **Regole di dimensione e leggibilità, confermate sul prototipo navigabile (28 ottobre 2026) e valide per tutte le schermate:**
+  - sempre sfondo bianco, tema chiaro: l'app non segue la modalità scura del telefono;
+  - il logo ARNOplast nell'intestazione è quello vero (non un segnaposto), leggermente più grande: circa 150×28;
+  - nella barra in basso le icone sono più grandi (circa 27×27) e le etichette sotto più leggibili (circa 11,5px);
+  - le icone sovrapposte alle foto (video, preferiti) e i pulsanti icona nella scheda prodotto sono anch'essi un po' più grandi di quanto provato inizialmente;
+  - **le foto dei prodotti non si ritagliano mai**: si vedono intere, anche quando non riempiono tutto lo spazio (importante per gli accessori, spesso di proporzioni diverse dalle foto principali); i riquadri delle foto hanno sempre sfondo bianco;
+  - sulla scheda prodotto, le foto si possono aprire a schermo intero (tocco per ingrandire, frecce per scorrere tra le foto dello stesso prodotto).
+- **Bozze v3:** prima di sviluppare l'interfaccia prepariamo le bozze v3 complete (tutte le schermate, nello stile e con la navigazione appena confermati, comprese le regole sopra), da approvare.
 
 ## 9. Qualità
 
