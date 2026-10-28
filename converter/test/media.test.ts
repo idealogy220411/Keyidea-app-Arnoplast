@@ -3,6 +3,7 @@ import { copyFile, mkdtemp, readdir, rm, stat, utimes, writeFile } from 'node:fs
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { writePsdBuffer } from 'ag-psd';
 import sharp from 'sharp';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { processImage, rasterizeVector, UnsupportedImageError } from '../src/media';
@@ -29,6 +30,18 @@ function solidPng(width: number, height: number): Promise<Buffer> {
   return sharp({ create: { width, height, channels: 3, background: '#336699' } })
     .png()
     .toBuffer();
+}
+
+/** .psd minimo e valido (nessun livello, solo l'immagine composita), di un solo colore opaco. */
+function solidPsd(width: number, height: number, [r, g, b]: [number, number, number]): Buffer {
+  const data = new Uint8ClampedArray(width * height * 4);
+  for (let i = 0; i < width * height; i++) {
+    data[i * 4] = r;
+    data[i * 4 + 1] = g;
+    data[i * 4 + 2] = b;
+    data[i * 4 + 3] = 255;
+  }
+  return Buffer.from(writePsdBuffer({ width, height, imageData: { width, height, data }, children: [] }));
 }
 
 afterEach(async () => {
@@ -116,18 +129,17 @@ describe('processImage', () => {
   });
 
   it('rejects unsupported formats with a typed error', async () => {
-    for (const name of ['disegno.psd', 'disegno.eps']) {
-      const src = await tempFile(name, '8BPS finto: nessun lettore sa aprirlo');
+    const name = 'disegno.eps';
+    const src = await tempFile(name, '8BPS finto: nessun lettore sa aprirlo');
 
-      const error = await processImage(src, await tempDir()).catch((e: unknown) => e);
+    const error = await processImage(src, await tempDir()).catch((e: unknown) => e);
 
-      expect(error).toBeInstanceOf(UnsupportedImageError);
-      expect(error).toMatchObject({
-        name: 'UnsupportedImageError',
-        file: src,
-        message: `formato immagine non supportato: ${name}`,
-      });
-    }
+    expect(error).toBeInstanceOf(UnsupportedImageError);
+    expect(error).toMatchObject({
+      name: 'UnsupportedImageError',
+      file: src,
+      message: `formato immagine non supportato: ${name}`,
+    });
   });
 
   it('rejects images that sharp cannot decode', async () => {
@@ -185,6 +197,31 @@ describe('processImage', () => {
 
     expect(ref.width).toBe(200);
     expect(ref.height).toBe(300);
+  });
+
+  it('converts a photoshop psd (flattened composite image) to webp', async () => {
+    const src = await tempFile('foto.psd', solidPsd(400, 300, [51, 102, 153]));
+    const outDir = await tempDir();
+
+    const ref = await processImage(src, outDir);
+
+    expect(ref.width).toBe(400);
+    expect(ref.height).toBe(300);
+    const { data } = await sharp(join(outDir, ref.detail.replace('img/', '')))
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    expect(data[0]).toBeCloseTo(51, -1);
+    expect(data[1]).toBeCloseTo(102, -1);
+    expect(data[2]).toBeCloseTo(153, -1);
+  });
+
+  it('rejects a psd without a readable composite image with a typed error', async () => {
+    const src = await tempFile('rotto.psd', '8BPS finto: nessun lettore sa aprirlo');
+
+    const error = await processImage(src, await tempDir()).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(UnsupportedImageError);
+    expect(error).toMatchObject({ message: 'formato immagine non supportato: rotto.psd' });
   });
 });
 

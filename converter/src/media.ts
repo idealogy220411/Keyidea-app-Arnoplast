@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { basename, extname, join } from 'node:path';
 import { promisify } from 'node:util';
 import type { ImageRef } from '@arnoplast/schema';
+import { initializeCanvas, readPsd } from 'ag-psd';
 import sharp from 'sharp';
 
 const execFileAsync = promisify(execFile);
@@ -16,10 +17,36 @@ const VECTOR_DPI = '200';
 /** Oltre questo tempo `pdftoppm` si considera bloccato: il processo si uccide e il disegno diventa un avviso. */
 const RASTERIZE_TIMEOUT_MS = 60_000;
 
-/** Formati raster che il convertitore accetta (nomi di sharp). PSD, EPS e simili restano fuori. */
+/** Formati raster che il convertitore accetta (nomi di sharp). EPS e simili restano fuori. */
 const RASTER_FORMATS = new Set(['jpeg', 'png', 'tiff', 'webp', 'gif']);
 /** Formati vettoriali che `pdftoppm` sa aprire (le `.ai` moderne sono PDF). */
 const VECTOR_EXTENSIONS = new Set(['.pdf', '.ai']);
+
+// ag-psd chiede una fabbrica per il suo oggetto "ImageData": di norma usa un <canvas> del DOM
+// (o il pacchetto nativo `canvas` in Node). A noi serve solo il buffer di pixel dell'immagine
+// composita, quindi forniamo un'implementazione minima che non richiede compilazione nativa.
+initializeCanvas(
+  () => {
+    throw new Error('ag-psd: creazione canvas non attesa (si legge solo image data grezza)');
+  },
+  (width, height) => ({ width, height, data: new Uint8ClampedArray(width * height * 4) }),
+);
+
+/**
+ * Decodifica l'immagine composita (il risultato finale "appiattito") di un file Photoshop in pixel
+ * RGBA grezzi. Restituisce `null` se il file non è un .psd leggibile o non ha un'immagine composita
+ * salvata (puramente teorico: InDesign stesso richiede che ce ne sia una per mostrare l'anteprima).
+ */
+function decodePsd(bytes: Buffer): { data: Buffer; width: number; height: number } | null {
+  try {
+    const psd = readPsd(bytes, { skipLayerImageData: true, skipThumbnail: true, useImageData: true });
+    if (!psd.imageData) return null;
+    const { width, height, data } = psd.imageData;
+    return { data: Buffer.from(data.buffer, data.byteOffset, data.byteLength), width, height };
+  } catch {
+    return null;
+  }
+}
 
 /** Il file non è in un formato che il convertitore sa trasformare in immagine (o non si riesce a leggerlo). */
 export class UnsupportedImageError extends Error {
@@ -71,10 +98,17 @@ export async function processImage(src: string, imgDir: string): Promise<ImageRe
     if (size) return { ...ref, ...size };
   }
 
+  // I .psd si decodificano a parte (ag-psd): il resto arriva a `sharp` come file originale.
+  const isPsd = extname(src).toLowerCase() === '.psd';
+  const psd = isPsd ? decodePsd(bytes) : null;
+  if (isPsd && !psd) throw new UnsupportedImageError(src);
+  const decoded = () =>
+    psd ? sharp(psd.data, { raw: { width: psd.width, height: psd.height, channels: 4 } }) : sharp(bytes);
+
   // Foto su fondo bianco: la trasparenza va appiattita sul bianco, altrimenti i PNG diventano neri.
   // `.rotate()` applica l'orientamento EXIF; `srgb` serve ai JPEG CMYK di InDesign.
   const encode = (side: number) =>
-    sharp(bytes)
+    decoded()
       .rotate()
       .flatten({ background: '#ffffff' })
       .toColorspace('srgb')
@@ -86,8 +120,10 @@ export async function processImage(src: string, imgDir: string): Promise<ImageRe
   let thumb: Buffer;
   let detail: { data: Buffer; info: { width: number; height: number } };
   try {
-    const format = (await sharp(bytes).metadata()).format;
-    if (format === undefined || !RASTER_FORMATS.has(format)) throw new UnsupportedImageError(src);
+    if (!psd) {
+      const format = (await sharp(bytes).metadata()).format;
+      if (format === undefined || !RASTER_FORMATS.has(format)) throw new UnsupportedImageError(src);
+    }
     thumb = (await encode(THUMB_SIDE)).data;
     detail = await encode(DETAIL_SIDE);
   } catch (error) {
