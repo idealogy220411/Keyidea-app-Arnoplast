@@ -1,7 +1,16 @@
 # Configurazione del convertitore del catalogo Arno Plast.
 #
-# Valori provvisori: vanno verificati sul file IDML reale del grafico
-# (nomi degli stili, ordine delle colonne, estensioni dei disegni).
+# Taratura fatta sul primo pacchetto InDesign reale del cliente (linea Agricoltura, italiano,
+# ottobre 2026: vedi docs/superpowers/plans/2026-10-28-taratura-pacchetto-reale.md). Nel file reale:
+# - non esistono stili di paragrafo personalizzati (tutto il testo usa uno stile «normale»): il ruolo
+#   del testo (titolo, caratteristica, dimensione...) si riconosce solo dallo stile di CARATTERE;
+# - il materiale (FE, FV, PA, PET, PE, PP, PVC) non ha uno stile dedicato: si riconosce dal contenuto,
+#   confrontandolo con l'elenco dei materiali ammessi, qualunque sia il suo stile (o l'assenza di stile);
+# - le categorie non hanno una pagina di apertura con il nome in grande: si dichiarano qui sotto
+#   (vedi `categories`) e si riconoscono quando un'etichetta senza stile di carattere, ripetuta a
+#   margine pagina, corrisponde al nome di una di esse (maiuscole/minuscole non contano).
+# Le linee garden e olive non hanno ancora un pacchetto reale: i loro valori sono ancora quelli
+# ipotizzati nella Fase 1 e vanno verificati quando arriverà il rispettivo pacchetto.
 
 # Lingue del catalogo. «it» è la lingua di riferimento e deve esserci sempre.
 # Per ogni lingua serve una cartella con il suo file IDML.
@@ -16,13 +25,36 @@ lines:
   olive:
     name: { it: Raccolta olive, en: Olive harvesting }
 
-# Nomi degli stili di paragrafo InDesign (senza il prefisso del gruppo di stili).
+# Categorie di ogni linea (identificativo e nome per lingua), nell'ordine del catalogo cartaceo.
+# Servono solo a RICONOSCERE l'etichetta di categoria che si ripete a margine di ogni pagina prodotto
+# (confronto senza maiuscole/minuscole): l'ordine con cui le categorie finiscono nei dati pubblicati
+# resta quello con cui le etichette compaiono leggendo il documento, non quello scritto qui.
+categories:
+  # Segnaposto: da correggere con le categorie reali lette dall'indice del catalogo 2026.1.
+  agricoltura:
+    - id: copripalo
+      name: { it: Copripalo, en: Post caps }
+  # Segnaposto: da correggere quando arriverà il pacchetto reale della linea Garden.
+  garden:
+    - id: copripalo
+      name: { it: COPRIPALO, en: POST CAPS }
+  # Segnaposto: da correggere quando arriverà il pacchetto reale della linea Raccolta olive.
+  olive:
+    - id: raccolta
+      name: { it: RACCOLTA, en: HARVESTING }
+
+# Nomi degli stili di CARATTERE InDesign (senza il prefisso del gruppo di stili): nel file reale non
+# esistono stili di paragrafo dedicati, quindi il ruolo del testo si riconosce da questi soli.
 styles:
-  category: Titolo categoria     # apre una categoria
-  product: Titolo prodotto       # apre un prodotto nella categoria corrente
-  feature: Caratteristiche       # una caratteristica del prodotto (il punto elenco si toglie da solo)
-  dimension: Dimensioni          # una misura del prodotto (il punto elenco si toglie da solo)
-  material: Bollino materiale    # sigla del materiale: FE, FV, PA, PET, PE, PP, PVC
+  product: TITOLO                # titolo di prodotto; lo stesso stile apre anche le intestazioni sotto
+  entry: CARATTERTISTICHE        # riga di caratteristica o di dimensione (il punto elenco si toglie da solo)
+  # Testo (per lingua) delle intestazioni letterali da riconoscere e scartare: non sono nomi di prodotto,
+  # ma intestazioni che aprono l'elenco delle caratteristiche o delle dimensioni del prodotto corrente.
+  featuresHeading: { it: CARATTERISTICHE, en: FEATURES }
+  dimensionsHeading: { it: DIMENSIONI, en: DIMENSIONS }
+  # Intestazione (per lingua) che apre l'elenco degli optional di fissaggio del prodotto corrente
+  # (per esempio «VITERIA STANDARD 4 PZ»): sono testo libero, non riferimenti a codici articolo.
+  optionalFixingHeading: { it: 'OPTIONAL DI FISSAGGIO', en: 'FIXING OPTIONS' }
 
 # Significato delle colonne della tabella articoli, nell'ordine in cui compaiono.
 # Valori ammessi: code, description, perPack, perBox, perPallet, ignore.

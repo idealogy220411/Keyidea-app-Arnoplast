@@ -30,20 +30,22 @@ async function defaultConfigWith(change: (raw: Record<string, unknown>) => void)
 
 it('config: loads the default file', async () => {
   const config = await loadConfig(DEFAULT_CONFIG);
-  expect(config.styles.product).toBe('Titolo prodotto');
+  expect(config.styles.product).toBe('TITOLO');
   expect(config.articleColumns.length).toBe(5);
   expect(config.styles).toEqual({
-    category: 'Titolo categoria',
-    product: 'Titolo prodotto',
-    feature: 'Caratteristiche',
-    dimension: 'Dimensioni',
-    material: 'Bollino materiale',
+    product: 'TITOLO',
+    entry: 'CARATTERTISTICHE',
+    featuresHeading: { it: 'CARATTERISTICHE', en: 'FEATURES' },
+    dimensionsHeading: { it: 'DIMENSIONI', en: 'DIMENSIONS' },
+    optionalFixingHeading: { it: 'OPTIONAL DI FISSAGGIO', en: 'FIXING OPTIONS' },
   });
   expect(config.articleColumns).toEqual(['code', 'description', 'perPack', 'perBox', 'perPallet']);
   expect(config.languages).toEqual(['it', 'en']);
   expect(config.lines.agricoltura.name).toEqual({ it: 'Agricoltura', en: 'Agriculture' });
   expect(config.lines.garden.name).toEqual({ it: 'Garden', en: 'Garden' });
   expect(config.lines.olive.name).toEqual({ it: 'Raccolta olive', en: 'Olive harvesting' });
+  expect(config.categories.agricoltura).toHaveLength(1);
+  expect(config.categories.agricoltura[0]).toEqual({ id: 'copripalo', name: { it: 'Copripalo', en: 'Post caps' } });
   expect(config.drawingExtensions).toEqual(['.ai', '.pdf', '.eps', '.svg']);
   expect(new RegExp(config.optionalPattern, 'i').test('Dado a griffe M6 (optional)')).toBe(true);
   expect(config.qrFilenamePattern).toBe('qr');

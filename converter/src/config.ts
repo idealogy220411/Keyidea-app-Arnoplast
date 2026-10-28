@@ -16,8 +16,30 @@ export type ConverterConfig = {
   languages: string[];
   /** Nome di ogni linea, per lingua. */
   lines: Record<LineId, { name: LocalizedText }>;
-  /** Nomi degli stili di paragrafo InDesign che il convertitore riconosce. */
-  styles: { category: string; product: string; feature: string; dimension: string; material: string };
+  /**
+   * Categorie di ogni linea (identificativo e nome per lingua), nell'ordine del catalogo cartaceo. Nel file
+   * reale non esiste una pagina di apertura con il nome della categoria: questo elenco serve solo a
+   * *riconoscere* un'etichetta a margine pagina come inizio di una categoria dichiarata; l'ordine con cui le
+   * categorie finiscono nei dati resta quello con cui le etichette compaiono leggendo il documento.
+   */
+  categories: Record<LineId, Array<{ id: string; name: LocalizedText }>>;
+  /**
+   * Nomi degli stili di **carattere** InDesign che il convertitore riconosce (nel file reale non esistono stili
+   * di paragrafo personalizzati: tutto il testo usa lo stesso, quindi il ruolo si riconosce dallo stile di
+   * carattere). Il materiale e le categorie non hanno uno stile dedicato: si riconoscono dal contenuto.
+   */
+  styles: {
+    /** Titolo di prodotto; lo stesso stile apre anche le intestazioni sotto e l'elenco degli optional di fissaggio. */
+    product: string;
+    /** Righe di caratteristiche e di dimensioni (lo stesso stile per entrambe: il tipo lo decide l'intestazione che precede). */
+    entry: string;
+    /** Testo dell'intestazione «CARATTERISTICHE», per lingua: apre l'elenco delle caratteristiche del prodotto corrente. */
+    featuresHeading: LocalizedText;
+    /** Testo dell'intestazione «DIMENSIONI», per lingua: apre l'elenco delle dimensioni del prodotto corrente. */
+    dimensionsHeading: LocalizedText;
+    /** Testo dell'intestazione «OPTIONAL DI FISSAGGIO», per lingua: apre l'elenco degli optional del prodotto corrente. */
+    optionalFixingHeading: LocalizedText;
+  };
   /** Significato di ogni colonna della tabella articoli, per posizione. */
   articleColumns: Array<'code' | 'description' | 'perPack' | 'perBox' | 'perPallet' | 'ignore'>;
   /** Espressione regolare (senza distinzione tra maiuscole e minuscole) delle descrizioni degli articoli optional. */
@@ -59,8 +81,12 @@ const material = z.enum(MATERIALS, {
   error: (issue) => `Materiale sconosciuto: ${quote(issue.input)} (ammessi: ${MATERIALS.join(', ')})`,
 });
 
-const lineName = z.record(langCode, text).refine((name) => Object.hasOwn(name, REFERENCE_LANG), {
+const localizedName = z.record(langCode, text).refine((name) => Object.hasOwn(name, REFERENCE_LANG), {
   error: `Manca il nome nella lingua di riferimento ${quote(REFERENCE_LANG)}`,
+});
+
+const lineIdForCategories = z.enum(LINE_IDS, {
+  error: (issue) => `Linea sconosciuta: ${quote(issue.input)} (ammesse: ${LINE_IDS.join(', ')})`,
 });
 
 const configSchema: z.ZodType<ConverterConfig> = z.strictObject({
@@ -69,14 +95,18 @@ const configSchema: z.ZodType<ConverterConfig> = z.strictObject({
   }),
   lines: z.record(
     z.enum(LINE_IDS, { error: (issue) => `Linea sconosciuta: ${quote(issue.input)} (ammesse: ${LINE_IDS.join(', ')})` }),
-    z.strictObject({ name: lineName }),
+    z.strictObject({ name: localizedName }),
+  ),
+  categories: z.record(
+    lineIdForCategories,
+    z.array(z.strictObject({ id: text, name: localizedName })),
   ),
   styles: z.strictObject({
-    category: text,
     product: text,
-    feature: text,
-    dimension: text,
-    material: text,
+    entry: text,
+    featuresHeading: localizedName,
+    dimensionsHeading: localizedName,
+    optionalFixingHeading: localizedName,
   }),
   articleColumns: z
     .array(z.enum(['code', 'description', 'perPack', 'perBox', 'perPallet', 'ignore']))
