@@ -42,7 +42,9 @@ export type RawIdml = {
 
 const NS = 'xmlns:idPkg="http://ns.adobe.com/AdobeInDesign/idml/1.0/packaging" DOMVersion="20.0"';
 const XML_DECL = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
-const NO_PARAGRAPH_STYLE = '$ID/[No paragraph style]';
+// Come nel file reale: un solo stile di paragrafo per tutto il documento, nessuno stile dedicato.
+const NORMAL_PARAGRAPH_STYLE = '$ID/NormalParagraphStyle';
+const NO_CHARACTER_STYLE = '$ID/[No character style]';
 
 const createdDirs: string[] = [];
 afterAll(async () => {
@@ -58,9 +60,9 @@ function esc(value: string): string {
 }
 
 /** Come InDesign: i gruppi di stili sono separati da `:` scritto `%3a`. */
-function appliedStyle(style: string): string {
-  if (style === '') return `ParagraphStyle/${NO_PARAGRAPH_STYLE}`;
-  return `ParagraphStyle/${esc(style.replace(/:/g, '%3a'))}`;
+function appliedCharacterStyle(style: string): string {
+  if (style === '') return `CharacterStyle/${NO_CHARACTER_STYLE}`;
+  return `CharacterStyle/${esc(style.replace(/:/g, '%3a'))}`;
 }
 
 function contentXml(text: string): string {
@@ -69,8 +71,8 @@ function contentXml(text: string): string {
 
 function paragraphXml(item: Extract<StoryItem, { kind: 'paragraph' }>): string {
   return (
-    `<ParagraphStyleRange AppliedParagraphStyle="${appliedStyle(item.style)}">` +
-    `<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]">` +
+    `<ParagraphStyleRange AppliedParagraphStyle="ParagraphStyle/${NORMAL_PARAGRAPH_STYLE}">` +
+    `<CharacterStyleRange AppliedCharacterStyle="${appliedCharacterStyle(item.style)}">` +
     `${contentXml(item.text)}<Br/></CharacterStyleRange></ParagraphStyleRange>`
   );
 }
@@ -92,8 +94,8 @@ function tableXml(item: Extract<StoryItem, { kind: 'table' }>, id: string): stri
     )
     .join('');
   return (
-    `<ParagraphStyleRange AppliedParagraphStyle="ParagraphStyle/${NO_PARAGRAPH_STYLE}">` +
-    `<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]">` +
+    `<ParagraphStyleRange AppliedParagraphStyle="ParagraphStyle/${NORMAL_PARAGRAPH_STYLE}">` +
+    `<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/${NO_CHARACTER_STYLE}">` +
     `<Table Self="${id}" HeaderRowCount="1" FooterRowCount="0" BodyRowCount="${Math.max(0, rowCount - 1)}" ColumnCount="${colCount}">` +
     `${rows}${cols}${cells}</Table><Br/></CharacterStyleRange></ParagraphStyleRange>`
   );

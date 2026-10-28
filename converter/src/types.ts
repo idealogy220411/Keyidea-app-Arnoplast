@@ -1,6 +1,11 @@
 /** Rettangolo in coordinate dello spread (punti tipografici, origine al centro dello spread). */
 export type Rect = { x: number; y: number; width: number; height: number };
 
+/**
+ * `style` è lo stile di **carattere** InDesign (non di paragrafo): nel file reale tutto il testo usa lo stesso
+ * stile di paragrafo (`NormalParagraphStyle`), quindi solo lo stile di carattere distingue titoli, caratteristiche,
+ * dimensioni e celle di tabella. Stringa vuota = nessuno stile di carattere applicato.
+ */
 export type StoryItem =
   | { kind: 'paragraph'; style: string; text: string }
   | { kind: 'table'; rows: string[][] };

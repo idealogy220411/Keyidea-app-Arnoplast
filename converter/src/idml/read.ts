@@ -57,59 +57,76 @@ function unwrap(root: XNode[], wrapper: string, tag: string): XNode | undefined 
 // Storie
 // ---------------------------------------------------------------------------
 
-const PARAGRAPH_STYLE_PREFIX = 'ParagraphStyle/';
-const NO_PARAGRAPH_STYLE = '$ID/[No paragraph style]';
+const CHARACTER_STYLE_PREFIX = 'CharacterStyle/';
+const NO_CHARACTER_STYLE = '$ID/[No character style]';
 
 /**
- * `ParagraphStyle/Gruppo%3aNome` → `Nome`: toglie il prefisso, decodifica `%3a` in `:`,
+ * `CharacterStyle/Gruppo%3aNome` → `Nome`: toglie il prefisso, decodifica `%3a` in `:`,
  * tiene la parte dopo l'ultimo `:` (gli stili possono stare in gruppi). Lo stile
- * `$ID/[No paragraph style]` diventa una stringa vuota.
+ * `$ID/[No character style]` (o l'attributo assente) diventa una stringa vuota.
  */
 function styleName(applied: string | undefined): string {
   if (!applied) return '';
-  let name = applied.startsWith(PARAGRAPH_STYLE_PREFIX) ? applied.slice(PARAGRAPH_STYLE_PREFIX.length) : applied;
+  let name = applied.startsWith(CHARACTER_STYLE_PREFIX) ? applied.slice(CHARACTER_STYLE_PREFIX.length) : applied;
   try {
     name = decodeURIComponent(name);
   } catch {
     name = name.replace(/%3a/gi, ':');
   }
-  if (name === NO_PARAGRAPH_STYLE) return '';
+  if (name === NO_CHARACTER_STYLE) return '';
   return name.slice(name.lastIndexOf(':') + 1);
 }
 
 /**
- * Cammina la storia in ordine. Un paragrafo finisce a ogni `<Br/>` e alla fine del
- * `ParagraphStyleRange`; i paragrafi vuoti si scartano. Gli elementi sconosciuti
- * (`XMLElement`, `CharacterStyleRange`, `Change`, …) si attraversano; le `Note` si saltano.
+ * Cammina la storia in ordine. Nel file reale non esistono stili di paragrafo personalizzati (tutto il
+ * testo usa `NormalParagraphStyle`): il ruolo di ogni testo si riconosce solo dallo stile di **carattere**
+ * del `CharacterStyleRange` più vicino. Un paragrafo finisce a ogni `<Br/>`, alla fine del
+ * `ParagraphStyleRange` e **anche quando lo stile di carattere cambia**: senza quest'ultimo caso un'intestazione
+ * (per esempio «CARATTERISTICHE», stile `TITOLO`) seguita, nello stesso paragrafo, da un `<Br/>` dentro un
+ * `CharacterStyleRange` di stile diverso finirebbe accorpata con lo stile sbagliato (caso reale, verificato sul
+ * pacchetto del cliente). Lo stile di un testo è quello impostato all'ultimo `Content` letto, non quello del nodo
+ * attraversato in quel momento: così un `<Br/>` "orfano" in un `CharacterStyleRange` successivo, senza contenuto
+ * proprio, chiude comunque il paragrafo con lo stile giusto. Gli elementi sconosciuti (`XMLElement`, `Change`, …)
+ * si attraversano; le `Note` si saltano.
  */
 function readItems(nodes: XNode[]): StoryItem[] {
   const items: StoryItem[] = [];
   let buffer = '';
+  let bufferStyle = '';
 
-  const flush = (style: string): void => {
-    if (buffer.trim() !== '') items.push({ kind: 'paragraph', style, text: buffer });
+  const flush = (): void => {
+    if (buffer.trim() !== '') items.push({ kind: 'paragraph', style: bufferStyle, text: buffer });
     buffer = '';
+  };
+
+  /** Chiude il paragrafo in corso se lo stile cambia, poi adotta il nuovo stile per il testo che segue. */
+  const setStyle = (style: string): void => {
+    if (style === bufferStyle) return;
+    flush();
+    bufferStyle = style;
   };
 
   const walk = (list: XNode[], style: string): void => {
     for (const node of list) {
       switch (tagOf(node)) {
         case 'Content':
+          setStyle(style);
           buffer += textOf(node);
           break;
         case 'Br':
-          flush(style);
+          flush();
           break;
         case 'Table':
-          flush(style);
+          flush();
           items.push({ kind: 'table', rows: readTable(node) });
           break;
-        case 'ParagraphStyleRange': {
-          const own = styleName(attr(node, 'AppliedParagraphStyle'));
-          walk(kids(node), own);
-          flush(own);
+        case 'CharacterStyleRange':
+          walk(kids(node), styleName(attr(node, 'AppliedCharacterStyle')));
           break;
-        }
+        case 'ParagraphStyleRange':
+          walk(kids(node), style);
+          flush();
+          break;
         case 'Note':
           break;
         default:
@@ -119,7 +136,7 @@ function readItems(nodes: XNode[]): StoryItem[] {
   };
 
   walk(nodes, '');
-  flush('');
+  flush();
   return items;
 }
 

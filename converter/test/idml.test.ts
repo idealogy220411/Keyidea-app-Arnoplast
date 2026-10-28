@@ -63,10 +63,10 @@ describe('readIdml', () => {
   });
 
   it('splits paragraphs on Br', async () => {
-    const style = 'ParagraphStyle/Caratteristiche';
+    const style = 'CharacterStyle/Caratteristiche';
     const file = await buildRawIdml({
       stories: {
-        s1: `<ParagraphStyleRange AppliedParagraphStyle="${style}"><CharacterStyleRange>${content('prima riga')}<Br/>${content('seconda riga')}<Br/></CharacterStyleRange></ParagraphStyleRange>`,
+        s1: `<ParagraphStyleRange AppliedParagraphStyle="ParagraphStyle/$ID/NormalParagraphStyle"><CharacterStyleRange AppliedCharacterStyle="${style}">${content('prima riga')}<Br/>${content('seconda riga')}<Br/></CharacterStyleRange></ParagraphStyleRange>`,
       },
       spreads: [`<TextFrame Self="f1" ParentStory="s1" ItemTransform="1 0 0 1 0 0">${path(0, 0, 100, 50)}</TextFrame>`],
     });
@@ -81,8 +81,8 @@ describe('readIdml', () => {
     const file = await buildRawIdml({
       stories: {
         s1:
-          `<ParagraphStyleRange AppliedParagraphStyle="ParagraphStyle/Titolo prodotto"><CharacterStyleRange>${content('SENZA BR')}</CharacterStyleRange></ParagraphStyleRange>` +
-          `<ParagraphStyleRange AppliedParagraphStyle="ParagraphStyle/Caratteristiche"><CharacterStyleRange>${content('a ')}</CharacterStyleRange><CharacterStyleRange>${content('capo')}</CharacterStyleRange></ParagraphStyleRange>`,
+          `<ParagraphStyleRange AppliedParagraphStyle="ParagraphStyle/$ID/NormalParagraphStyle"><CharacterStyleRange AppliedCharacterStyle="CharacterStyle/Titolo prodotto">${content('SENZA BR')}</CharacterStyleRange></ParagraphStyleRange>` +
+          `<ParagraphStyleRange AppliedParagraphStyle="ParagraphStyle/$ID/NormalParagraphStyle"><CharacterStyleRange AppliedCharacterStyle="CharacterStyle/Caratteristiche">${content('a ')}</CharacterStyleRange><CharacterStyleRange AppliedCharacterStyle="CharacterStyle/Caratteristiche">${content('capo')}</CharacterStyleRange></ParagraphStyleRange>`,
       },
       spreads: [`<TextFrame Self="f1" ParentStory="s1" ItemTransform="1 0 0 1 0 0">${path(0, 0, 100, 50)}</TextFrame>`],
     });
@@ -90,6 +90,46 @@ describe('readIdml', () => {
     expect(itemsOf(doc, textFrame(doc.spreads[0].frames[0]))).toEqual([
       { kind: 'paragraph', style: 'Titolo prodotto', text: 'SENZA BR' },
       { kind: 'paragraph', style: 'Caratteristiche', text: 'a capo' },
+    ]);
+  });
+
+  it('ends a paragraph when the character style changes without a Br (real file case)', async () => {
+    // Struttura esatta trovata nel pacchetto reale (storia delle caratteristiche): un solo paragrafo
+    // (`ParagraphStyleRange`, tutto NormalParagraphStyle) con l'intestazione in stile TITOLO senza `<Br/>`
+    // proprio, seguita da un secondo `CharacterStyleRange` di stile diverso che contiene solo un `<Br/>`.
+    // Senza il flush sul cambio di stile di carattere, "CARATTERISTICHE" finirebbe letta con lo stile
+    // del secondo CharacterStyleRange invece che con TITOLO.
+    const file = await buildRawIdml({
+      stories: {
+        s1:
+          `<ParagraphStyleRange AppliedParagraphStyle="ParagraphStyle/$ID/NormalParagraphStyle">` +
+          `<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/TITOLO">${content('CARATTERISTICHE')}</CharacterStyleRange>` +
+          `<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/CARATTERTISTICHE"><Br/></CharacterStyleRange>` +
+          `</ParagraphStyleRange>`,
+      },
+      spreads: [`<TextFrame Self="f1" ParentStory="s1" ItemTransform="1 0 0 1 0 0">${path(0, 0, 100, 50)}</TextFrame>`],
+    });
+    const doc = await readIdml(file);
+    expect(itemsOf(doc, textFrame(doc.spreads[0].frames[0]))).toEqual([
+      { kind: 'paragraph', style: 'TITOLO', text: 'CARATTERISTICHE' },
+    ]);
+  });
+
+  it('splits content across two character styles in the same paragraph with no Br between them', async () => {
+    const file = await buildRawIdml({
+      stories: {
+        s1:
+          `<ParagraphStyleRange AppliedParagraphStyle="ParagraphStyle/$ID/NormalParagraphStyle">` +
+          `<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/TITOLO">${content('CARATTERISTICHE')}</CharacterStyleRange>` +
+          `<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/CARATTERTISTICHE">${content('viteria certificata 8.8')}</CharacterStyleRange>` +
+          `<Br/></ParagraphStyleRange>`,
+      },
+      spreads: [`<TextFrame Self="f1" ParentStory="s1" ItemTransform="1 0 0 1 0 0">${path(0, 0, 100, 50)}</TextFrame>`],
+    });
+    const doc = await readIdml(file);
+    expect(itemsOf(doc, textFrame(doc.spreads[0].frames[0]))).toEqual([
+      { kind: 'paragraph', style: 'TITOLO', text: 'CARATTERISTICHE' },
+      { kind: 'paragraph', style: 'CARATTERTISTICHE', text: 'viteria certificata 8.8' },
     ]);
   });
 
@@ -115,7 +155,7 @@ describe('readIdml', () => {
     expect(item).toMatchObject({ kind: 'paragraph', style: 'Titolo prodotto' });
   });
 
-  it('maps the no-paragraph style to an empty string', async () => {
+  it('maps the no-character style to an empty string', async () => {
     const file = await buildIdml({
       spreads: [
         {
@@ -309,7 +349,7 @@ describe('readIdml', () => {
         s1:
           `<InCopyExportOption IncludeGraphicProxies="true"/>` +
           `<XMLElement Self="x1" MarkupTag="XMLTag/Root">` +
-          `<ParagraphStyleRange AppliedParagraphStyle="ParagraphStyle/Titolo prodotto"><CharacterStyleRange>` +
+          `<ParagraphStyleRange AppliedParagraphStyle="ParagraphStyle/$ID/NormalParagraphStyle"><CharacterStyleRange AppliedCharacterStyle="CharacterStyle/Titolo prodotto">` +
           `<XMLElement Self="x2" MarkupTag="XMLTag/Nome">${content('COPRIPALO')}</XMLElement>` +
           `<Note Self="n1"><ParagraphStyleRange AppliedParagraphStyle="ParagraphStyle/Nota"><CharacterStyleRange>${content('da rivedere')}</CharacterStyleRange></ParagraphStyleRange></Note>` +
           `${content(' PRISMA')}<Br/></CharacterStyleRange></ParagraphStyleRange>` +
