@@ -220,15 +220,18 @@ Riferimento: `docs/mockups/bozze-v2.html`.
    - filtri per linea, categoria, materiale e «con video»;
    - ricerche recenti.
 5. **Preferiti:**
-   - elenco dei codici salvati, anche di linee diverse;
-   - pulsante «Richiedi informazioni».
+   - elenco dei prodotti salvati, anche di linee diverse, con un pulsante indietro per tornare alla schermata precedente;
+   - ogni scheda ha un'icona cestino per toglierla dai preferiti direttamente da qui;
+   - modulo per inviare la richiesta di informazioni sui prodotti rimasti in lista (vedi sotto).
    - Un codice uscito dal catalogo resta in elenco come «Non più disponibile» e non entra nella richiesta.
 
 ### Richiesta di informazioni
 
-- L'app compone il messaggio nella lingua corrente, con l'elenco di codici e descrizioni.
-- Lo apre in Mail (`mailto:`) o in WhatsApp (`https://wa.me/<numero>?text=…`), e l'utente può modificarlo prima di inviarlo.
-- Se WhatsApp non è installato, compare solo l'opzione email.
+- L'app compone il messaggio nella lingua corrente, con l'elenco di codici e descrizioni, indicando nell'oggetto che la richiesta arriva dall'app.
+- Prima di inviare, chiede alcuni dati di chi scrive (inseriti a mano, non raccolti dall'app): nome, tipo privato/azienda, email (questi tre obbligatori), telefono e note (facoltativi). Finché nome, tipo ed email non sono compilati, l'invio resta disattivato.
+- Un'anteprima del messaggio si aggiorna in tempo reale mentre si compila il modulo.
+- Lo apre in Mail (`mailto:`) o in WhatsApp (`https://wa.me/<numero>?text=…`), e l'utente può modificarlo prima di inviarlo; un terzo pulsante copia il messaggio negli appunti, utile se i collegamenti diretti non si aprono.
+- Se WhatsApp non è installato, compare solo l'opzione email (più la copia).
 
 ### Offline e aggiornamenti
 
@@ -271,14 +274,21 @@ Riferimento: `docs/mockups/bozze-v2.html`.
 - **Carattere:** Lato (licenza libera OFL), incluso nell'app.
 - **Icone:** disegnate su misura nello stesso stile (tratto arrotondato): quelle delle tre linee in `docs/mockups/icone-linee-v1.html`, quelle delle azioni (filtri, video, email, WhatsApp, lingua, stato catalogo, chi siamo, contatti, privacy) in `docs/mockups/icone-funzionali-v1.html`.
 - **Stile visivo:** direzione «A · Essenziale» (sfondo chiaro, fasce e pulsanti nel rosso del marchio, schede con foto grandi), scelta tra tre proposte grafiche di riferimento.
-- **Barra in basso, confermata:** le 5 voci già decise (Agricoltura, Garden, Olive, Cerca, Preferiti), con le icone scelte, nello stile «A · Essenziale» — vedi `docs/mockups/bozze-v3-navigazione.html`.
+- **Barra in basso, confermata:** le 5 voci già decise (Agricoltura, Garden, Olive, Cerca, Preferiti), con le icone scelte — vedi `docs/mockups/bozze-v3-navigazione.html`.
 - **Regole di dimensione e leggibilità, confermate sul prototipo navigabile (28 ottobre 2026) e valide per tutte le schermate:**
   - sempre sfondo bianco, tema chiaro: l'app non segue la modalità scura del telefono;
   - il logo ARNOplast nell'intestazione è quello vero (non un segnaposto), leggermente più grande: circa 150×28;
-  - nella barra in basso le icone sono più grandi (circa 27×27) e le etichette sotto più leggibili (circa 11,5px);
+  - **barra in basso:** fondo rosso del marchio, icone ed etichette bianche (voce attiva bianco pieno, le altre semi-trasparenti), icone grandi (circa 33×33) centrate nell'altezza della barra, con un margine di rispetto sopra di circa 20px;
   - le icone sovrapposte alle foto (video, preferiti) e i pulsanti icona nella scheda prodotto sono anch'essi un po' più grandi di quanto provato inizialmente;
   - **le foto dei prodotti non si ritagliano mai**: si vedono intere, anche quando non riempiono tutto lo spazio (importante per gli accessori, spesso di proporzioni diverse dalle foto principali); i riquadri delle foto hanno sempre sfondo bianco;
-  - sulla scheda prodotto, le foto si possono aprire a schermo intero (tocco per ingrandire, frecce per scorrere tra le foto dello stesso prodotto).
+  - sulla scheda prodotto, le foto si possono aprire a schermo intero (tocco per ingrandire, frecce oppure gesto di scorrimento per passare tra le foto dello stesso prodotto).
+- **Schermata Preferiti, confermata sul prototipo:**
+  - un pulsante indietro in alto riporta alla schermata precedente;
+  - ogni scheda preferita ha un'icona cestino per toglierla dai preferiti, senza dover riaprire il prodotto;
+  - sotto l'elenco, un modulo per inviare la richiesta di informazioni sui prodotti rimasti in lista: nome (obbligatorio), tipo privato/azienda (obbligatorio, a scelta tra i due), email (obbligatoria), telefono e note (facoltativi, note su più righe);
+  - un'anteprima del messaggio si aggiorna in tempo reale mentre si compila il modulo;
+  - finché nome, tipo ed email non sono compilati, i pulsanti di invio restano disattivati con un avviso;
+  - oltre a Mail e WhatsApp, un terzo pulsante copia il messaggio negli appunti (utile quando i collegamenti `mailto:`/WhatsApp non si aprono automaticamente).
 - **Bozze v3:** prima di sviluppare l'interfaccia prepariamo le bozze v3 complete (tutte le schermate, nello stile e con la navigazione appena confermati, comprese le regole sopra), da approvare.
 
 ## 9. Qualità
@@ -297,7 +307,7 @@ Riferimento: `docs/mockups/bozze-v2.html`.
 
 ## 10. Privacy e statistiche
 
-- **Nessun dato personale:** l'app non raccoglie dati personali. Non ci sono account. I preferiti restano sul telefono. Le richieste partono dalla posta o da WhatsApp dell'utente.
+- **Nessun dato personale:** l'app non raccoglie dati personali. Non ci sono account. I preferiti restano sul telefono. Le richieste partono dalla posta o da WhatsApp dell'utente: i dati di contatto che l'utente scrive nel modulo (nome, tipo, email, telefono, note) restano nel messaggio che compone e non sono mai salvati o inviati altrove dall'app.
 - **Statistiche anonime con TelemetryDeck,** senza identificativi pubblicitari e senza richiesta di tracciamento. Eventi:
   - apertura dell'app (lingua);
   - linea, categoria e prodotto visti;
