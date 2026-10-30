@@ -228,11 +228,12 @@ export function extractLanguage(doc: IdmlDocument, config: ConverterConfig, lang
 
   /** I titoli in sospeso sono prodotti veri e propri, aperti in sequenza (l'ultimo resta quello corrente). */
   function pendingTitlesAreProducts(): void {
-    mode = undefined;
     for (const { text, anchor, where, owner } of pendingTitles) {
       // Lo stesso titolo ripetuto subito dopo (visto nel file reale, probabilmente una svista del grafico):
-      // non è un secondo prodotto.
+      // non è un secondo prodotto. Non tocca `mode`: se compare subito prima di «CARATTERISTICHE»/«DIMENSIONI»
+      // (come nel file reale), il prodotto corrente resta lo stesso e il contenuto che segue va ancora letto.
       if (text === owner.name) continue;
+      mode = undefined;
       if (activeCategory) {
         current = openProduct(text, anchor);
       } else {

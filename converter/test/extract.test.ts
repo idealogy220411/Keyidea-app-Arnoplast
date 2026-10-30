@@ -185,6 +185,19 @@ describe('extractLanguage', () => {
     expect(result.products[1].materials).toEqual(['PP']);
   });
 
+  it('keeps reading features after a title repeated right before the heading (real file: COPRIPALO MONVISO)', async () => {
+    // Nel file reale il titolo compare due volte di seguito subito prima di «CARATTERISTICHE» (una svista del
+    // grafico, non un secondo prodotto). Il titolo ripetuto finisce in sospeso (vedi «treats a pure-title
+    // frame…» sopra) e si risolve solo alla prima riga di contenuto vera; quella risoluzione non deve
+    // cancellare la sezione «CARATTERISTICHE» già riconosciuta, altrimenti tutte le sue righe vengono scartate.
+    const result = await extract(
+      oneProduct(product('COPRIPALO PRISMA'), featuresHeading(), entry('viteria certificata'), entry('resistente agli urti')),
+    );
+    expect(result.products.map((p) => p.name)).toEqual(['COPRIPALO PRISMA']);
+    expect(result.products[0].features).toEqual(['viteria certificata', 'resistente agli urti']);
+    expect(result.issues).toEqual([]);
+  });
+
   it('parses article table by position', async () => {
     const rows = [
       ['1807-1351', 'Coprip Prisma 7x7 (senza viteria)', '40', '40', '640'],
