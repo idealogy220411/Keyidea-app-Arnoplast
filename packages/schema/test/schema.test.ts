@@ -96,10 +96,11 @@ describe('parseLineData', () => {
     expect(errorMessage(() => parseLineData(line))).toContain('1807-135');
   });
 
-  it('accepts suffixed codes', () => {
+  it('accepts suffixed codes, in either letter case', () => {
     const line = validLine();
-    line.products[0].articles = [article('1807-1310GZ'), article('1807-0308GR')];
-    expect(parseLineData(line).products[0]?.articles).toHaveLength(2);
+    // Il cliente scrive il suffisso a volte maiuscolo, a volte minuscolo (visto nel file reale: «1807-0108gr»).
+    line.products[0].articles = [article('1807-1310GZ'), article('1807-0308GR'), article('1807-0108gr')];
+    expect(parseLineData(line).products[0]?.articles).toHaveLength(3);
   });
 
   it('rejects product without articles', () => {

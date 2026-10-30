@@ -8,7 +8,7 @@ export type LineId = (typeof LINE_IDS)[number];
 export const MATERIALS = ['FE', 'FV', 'PA', 'PET', 'PE', 'PP', 'PVC'] as const;
 export type Material = (typeof MATERIALS)[number];
 
-export const ARTICLE_CODE_RE = /^\d{4}-\d{4}[A-Z]{0,3}$/;
+export const ARTICLE_CODE_RE = /^\d{4}-\d{4}[A-Za-z]{0,3}$/;
 export const EDITION_RE = /^\d{4}\.\d+$/;
 export const LANG_RE = /^[a-z]{2}$/;
 export const REFERENCE_LANG = 'it';
@@ -46,7 +46,7 @@ const localizedListSchema = localized(z.array(z.string()));
 
 const articleCodeSchema = z.string().regex(ARTICLE_CODE_RE, {
   error: (issue) =>
-    `Codice articolo non valido: ${quote(issue.input)} (servono 4 cifre, un trattino, 4 cifre ed eventuali lettere maiuscole, per esempio 1807-1351)`,
+    `Codice articolo non valido: ${quote(issue.input)} (servono 4 cifre, un trattino, 4 cifre ed eventuali lettere, per esempio 1807-1351 o 1807-0108gr)`,
 });
 
 const editionSchema = z.string().regex(EDITION_RE, {

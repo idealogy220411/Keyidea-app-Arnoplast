@@ -309,11 +309,19 @@ describe('extractLanguage', () => {
     expect(result.issues[1].message).toContain('1807-135');
   });
 
-  it('accepts codes with letter suffixes', async () => {
+  it('accepts codes with letter suffixes, in either letter case', async () => {
+    // Il cliente scrive il suffisso a volte maiuscolo, a volte minuscolo (visto nel file reale: «1807-0108gr»).
     const result = await extract(
-      oneProduct(table(HEADER, ['1807-1310GZ', 'Zincato', '10', '10', '100'], ['1807-0308GR', 'Grigio', '10', '10', '100'])),
+      oneProduct(
+        table(
+          HEADER,
+          ['1807-1310GZ', 'Zincato', '10', '10', '100'],
+          ['1807-0308GR', 'Grigio', '10', '10', '100'],
+          ['1807-0108gr', 'Grigio', '10', '10', '100'],
+        ),
+      ),
     );
-    expect(result.products[0].articles.map((a) => a.code)).toEqual(['1807-1310GZ', '1807-0308GR']);
+    expect(result.products[0].articles.map((a) => a.code)).toEqual(['1807-1310GZ', '1807-0308GR', '1807-0108gr']);
     expect(result.issues).toEqual([]);
   });
 
